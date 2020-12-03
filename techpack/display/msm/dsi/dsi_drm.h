@@ -23,6 +23,9 @@ struct dsi_bridge {
 
 	struct dsi_display *display;
 	struct dsi_display_mode dsi_mode;
+#ifdef CONFIG_TARGET_PROJECT_C3Q
+	struct mutex lock;
+#endif
 };
 
 /**

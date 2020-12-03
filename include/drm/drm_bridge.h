@@ -296,6 +296,10 @@ struct drm_bridge {
 	const struct drm_bridge_funcs *funcs;
 	/** @driver_private: pointer to the bridge driver's internal context */
 	void *driver_private;
+#ifdef CONFIG_TARGET_PROJECT_C3Q
+	struct mutex lock;
+	bool is_dsi_drm_bridge;
+#endif
 };
 
 void drm_bridge_add(struct drm_bridge *bridge);
@@ -316,6 +320,10 @@ void drm_bridge_mode_set(struct drm_bridge *bridge,
 			 struct drm_display_mode *adjusted_mode);
 void drm_bridge_pre_enable(struct drm_bridge *bridge);
 void drm_bridge_enable(struct drm_bridge *bridge);
+
+#ifdef CONFIG_TARGET_PROJECT_C3Q
+int dsi_bridge_interface_enable(int timeout);
+#endif
 
 #ifdef CONFIG_DRM_PANEL_BRIDGE
 struct drm_bridge *drm_panel_bridge_add(struct drm_panel *panel,
