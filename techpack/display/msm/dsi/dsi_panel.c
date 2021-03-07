@@ -524,8 +524,19 @@ static int dsi_panel_power_off(struct dsi_panel *panel)
 		gpio_set_value(panel->reset_config.disp_en_gpio, 0);
 
 	if (gpio_is_valid(panel->reset_config.reset_gpio) &&
-					!panel->reset_gpio_always_on)
+					!panel->reset_gpio_always_on) {
+		#ifdef CONFIG_TARGET_PROJECT_C3Q
+		if (lcd_reset_keep_high)
+			DSI_WARN("%s: lcd-reset-gpio keep high\n", __func__);
+		else {
+			gpio_set_value(panel->reset_config.reset_gpio, 0);
+			DSI_ERR("%s: lcd-reset_gpio = 0\n", __func__);
+		}
+		#else
 		gpio_set_value(panel->reset_config.reset_gpio, 0);
+		#endif
+	}
+
 
 	if (gpio_is_valid(panel->reset_config.lcd_mode_sel_gpio))
 		gpio_set_value(panel->reset_config.lcd_mode_sel_gpio, 0);
