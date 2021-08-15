@@ -242,6 +242,9 @@ struct dsi_panel {
 	u32 dsi_refresh_flag;
 #endif
     int hbm_mode;
+#ifdef CONFIG_TARGET_PROJECT_C3Q
+	int cabc_mode;
+#endif
 };
 
 static inline bool dsi_panel_ulps_feature_enabled(struct dsi_panel *panel)
@@ -372,5 +375,9 @@ void dsi_set_backlight_control(struct dsi_panel *panel,
 #endif
 
 int dsi_panel_apply_hbm_mode(struct dsi_panel *panel);
+
+#ifdef CONFIG_TARGET_PROJECT_C3Q
+int dsi_panel_apply_cabc_mode(struct dsi_panel *panel);
+#endif
 
 #endif /* _DSI_PANEL_H_ */

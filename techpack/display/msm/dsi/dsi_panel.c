@@ -1914,6 +1914,12 @@ const char *cmd_set_prop_map[DSI_CMD_SET_MAX] = {
 	"qcom,mdss-dsi-post-mode-switch-on-command",
 	"qcom,mdss-dsi-qsync-on-commands",
 	"qcom,mdss-dsi-qsync-off-commands",
+#ifdef CONFIG_TARGET_PROJECT_C3Q
+	"qcom,mdss-dsi-dispparam-cabc-ui-on-command",
+	"qcom,mdss-dsi-dispparam-cabc-still-on-command",
+	"qcom,mdss-dsi-dispparam-cabc-movice-on-command",
+	"qcom,mdss-dsi-dispparam-cabc-off-command",
+#endif
         "qcom,mdss-dsi-dispparam-hbm-on-command",
         "qcom,mdss-dsi-dispparam-hbm-off-command",
 #ifdef CONFIG_TARGET_PROJECT_K7T
@@ -1950,6 +1956,12 @@ const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
 	"qcom,mdss-dsi-post-mode-switch-on-command-state",
 	"qcom,mdss-dsi-qsync-on-commands-state",
 	"qcom,mdss-dsi-qsync-off-commands-state",
+#ifdef CONFIG_TARGET_PROJECT_C3Q
+	"qcom,mdss-dsi-dispparam-cabc-ui-on-command-status",
+	"qcom,mdss-dsi-dispparam-cabc-still-on-command-status",
+	"qcom,mdss-dsi-dispparam-cabc-movice-on-command-status",
+	"qcom,mdss-dsi-dispparam-cabc-off-command-status",
+#endif
         "qcom,mdss-dsi-dispparam-hbm-on-command-state",
         "qcom,mdss-dsi-dispparam-hbm-off-command-state",
 #ifdef CONFIG_TARGET_PROJECT_K7T
@@ -4613,6 +4625,11 @@ int dsi_panel_enable(struct dsi_panel *panel)
 	if (panel->hbm_mode)
 		dsi_panel_apply_hbm_mode(panel);
 
+#ifdef CONFIG_TARGET_PROJECT_C3Q
+	if (panel->cabc_mode)
+		dsi_panel_apply_cabc_mode(panel);
+#endif
+
 	mutex_lock(&panel->panel_lock);
 
 	rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_ON);
@@ -4848,3 +4865,30 @@ int dsi_panel_apply_hbm_mode(struct dsi_panel *panel)
 
 	return rc;
 }
+
+#ifdef CONFIG_TARGET_PROJECT_C3Q
+int dsi_panel_apply_cabc_mode(struct dsi_panel *panel)
+{
+	static const enum dsi_cmd_set_type type_map[] = {
+		DSI_CMD_SET_DISP_CABC_OFF,
+		DSI_CMD_SET_DISP_CABC_UI_ON,
+		DSI_CMD_SET_DISP_CABC_STILL_ON,
+		DSI_CMD_SET_DISP_CABC_MOVIE_ON
+	};
+
+	enum dsi_cmd_set_type type;
+	int rc;
+
+	if (panel->cabc_mode >= 0 &&
+		panel->cabc_mode < ARRAY_SIZE(type_map))
+		type = type_map[panel->cabc_mode];
+	else
+		type = type_map[0];
+
+	mutex_lock(&panel->panel_lock);
+	rc = dsi_panel_tx_cmd_set(panel, type);
+	mutex_unlock(&panel->panel_lock);
+
+	return rc;
+}
+#endif
