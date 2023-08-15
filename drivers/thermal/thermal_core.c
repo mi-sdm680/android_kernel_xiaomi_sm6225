@@ -24,8 +24,8 @@
 #include <linux/suspend.h>
 #ifdef CONFIG_ARCH_QCOM
 #include <linux/cpu_cooling.h>
-//#include <linux/msm_drm_notify.h>
-#include <drm/drm_panel.h>
+#include <linux/msm_drm_notify.h>
+//#include <drm/drm_panel.h>
 #endif
 
 #define CREATE_TRACE_POINTS
