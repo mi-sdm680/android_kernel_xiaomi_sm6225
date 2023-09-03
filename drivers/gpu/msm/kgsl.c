@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2008-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <uapi/linux/sched/types.h>
@@ -1315,7 +1316,7 @@ kgsl_sharedmem_find(struct kgsl_process_private *private, uint64_t gpuaddr)
 	if (!private)
 		return NULL;
 
-	if (!kgsl_mmu_gpuaddr_in_range(private->pagetable, gpuaddr))
+	if (!kgsl_mmu_gpuaddr_in_range(private->pagetable, gpuaddr, 0))
 		return NULL;
 
 	spin_lock(&private->mem_lock);
@@ -2107,6 +2108,129 @@ done:
 	return result;
 }
 
+long kgsl_ioctl_gpu_aux_command(struct kgsl_device_private *dev_priv,
+		unsigned int cmd, void *data)
+{
+	struct kgsl_gpu_aux_command *param = data;
+	struct kgsl_device *device = dev_priv->device;
+	struct kgsl_context *context;
+	struct kgsl_drawobj **drawobjs;
+	struct kgsl_drawobj_sync *tsobj;
+	void __user *cmdlist;
+	u32 queued, count;
+	int i, index = 0;
+	long ret;
+	struct kgsl_gpu_aux_command_generic generic;
+
+	/* We support only one aux command */
+	if (param->numcmds != 1)
+		return -EINVAL;
+
+	if (!(param->flags & KGSL_GPU_AUX_COMMAND_TIMELINE))
+		return -EINVAL;
+
+	context = kgsl_context_get_owner(dev_priv, param->context_id);
+	if (!context)
+		return -EINVAL;
+
+	/*
+	 * param->numcmds is always one and we have one additional drawobj
+	 * for the timestamp sync if KGSL_GPU_AUX_COMMAND_SYNC flag is passed.
+	 * On top of that we make an implicit sync object for the last queued
+	 * timestamp on this context.
+	 */
+	count = (param->flags & KGSL_GPU_AUX_COMMAND_SYNC) ? 3 : 2;
+
+	drawobjs = kvcalloc(count, sizeof(*drawobjs), GFP_KERNEL);
+
+	if (!drawobjs) {
+		kgsl_context_put(context);
+		return -ENOMEM;
+	}
+
+	trace_kgsl_aux_command(context->id, param->numcmds, param->flags,
+		param->timestamp);
+
+	if (param->flags & KGSL_GPU_AUX_COMMAND_SYNC) {
+		struct kgsl_drawobj_sync *syncobj =
+			kgsl_drawobj_sync_create(device, context);
+
+		if (IS_ERR(syncobj)) {
+			ret = PTR_ERR(syncobj);
+			goto err;
+		}
+
+		drawobjs[index++] = DRAWOBJ(syncobj);
+
+		ret = kgsl_drawobj_sync_add_synclist(device, syncobj,
+				u64_to_user_ptr(param->synclist),
+				param->syncsize, param->numsyncs);
+		if (ret)
+			goto err;
+	}
+
+	kgsl_readtimestamp(device, context, KGSL_TIMESTAMP_QUEUED, &queued);
+
+	/*
+	 * Make an implicit sync object for the last queued timestamp on this
+	 * context
+	 */
+	tsobj = kgsl_drawobj_create_timestamp_syncobj(device,
+		context, queued);
+
+	if (IS_ERR(tsobj)) {
+		ret = PTR_ERR(tsobj);
+		goto err;
+	}
+
+	drawobjs[index++] = DRAWOBJ(tsobj);
+
+	cmdlist = u64_to_user_ptr(param->cmdlist);
+
+	/* Create a draw object for KGSL_GPU_AUX_COMMAND_TIMELINE */
+	if (copy_struct_from_user(&generic, sizeof(generic),
+		cmdlist, param->cmdsize)) {
+		ret = -EFAULT;
+		goto err;
+	}
+
+	if (generic.type == KGSL_GPU_AUX_COMMAND_TIMELINE) {
+		struct kgsl_drawobj_timeline *timelineobj;
+
+		timelineobj = kgsl_drawobj_timeline_create(device,
+			context);
+
+		if (IS_ERR(timelineobj)) {
+			ret = PTR_ERR(timelineobj);
+			goto err;
+		}
+
+		drawobjs[index++] = DRAWOBJ(timelineobj);
+
+		ret = kgsl_drawobj_add_timeline(dev_priv, timelineobj,
+			u64_to_user_ptr(generic.priv), generic.size);
+		if (ret)
+			goto err;
+	} else {
+		ret = -EINVAL;
+		goto err;
+	}
+
+	ret = device->ftbl->queue_cmds(dev_priv, context,
+		drawobjs, index, &param->timestamp);
+
+err:
+	kgsl_context_put(context);
+
+	if (ret && ret != -EPROTO) {
+		for (i = 0; i < count; i++)
+			kgsl_drawobj_destroy(drawobjs[i]);
+	}
+
+	kvfree(drawobjs);
+	return ret;
+}
+
 long kgsl_ioctl_cmdstream_readtimestamp_ctxtid(struct kgsl_device_private
 						*dev_priv, unsigned int cmd,
 						void *data)
@@ -2486,6 +2610,15 @@ static int memdesc_sg_virt(struct kgsl_memdesc *memdesc, unsigned long useraddr)
 
 	ret = sg_alloc_table_from_pages(memdesc->sgt, pages, npages,
 					0, memdesc->size, GFP_KERNEL);
+
+	if (ret)
+		goto out;
+
+	ret = kgsl_cache_range_op(memdesc, 0, memdesc->size,
+			KGSL_CACHE_OP_FLUSH);
+
+	if (ret)
+		sg_free_table(memdesc->sgt);
 out:
 	if (ret) {
 		for (i = 0; i < npages; i++)
@@ -2607,10 +2740,27 @@ static int kgsl_setup_dmabuf_useraddr(struct kgsl_device *device,
 			return -EFAULT;
 		}
 
-		/* Look for the fd that matches this the vma file */
+		/* Look for the fd that matches this vma file */
 		fd = iterate_fd(current->files, 0, match_file, vma->vm_file);
-		if (fd != 0)
+		if (fd) {
 			dmabuf = dma_buf_get(fd - 1);
+			if (IS_ERR(dmabuf)) {
+				up_read(&current->mm->mmap_sem);
+				return PTR_ERR(dmabuf);
+			}
+			/*
+			 * It is possible that the fd obtained from iterate_fd
+			 * was closed before passing the fd to dma_buf_get().
+			 * Hence dmabuf returned by dma_buf_get() could be
+			 * different from vma->vm_file->private_data. Return
+			 * failure if this happens.
+			 */
+			if (dmabuf != vma->vm_file->private_data) {
+				dma_buf_put(dmabuf);
+				up_read(&current->mm->mmap_sem);
+				return -EBADF;
+			}
+		}
 	}
 
 	if (IS_ERR_OR_NULL(dmabuf)) {
@@ -5222,6 +5372,9 @@ int kgsl_device_platform_probe(struct kgsl_device *device)
 	if (status)
 		goto error_close_mmu;
 
+	idr_init(&device->timelines);
+	spin_lock_init(&device->timelines_lock);
+
 	/*
 	 * The default request type PM_QOS_REQ_ALL_CORES is
 	 * applicable to all CPU cores that are online and
@@ -5296,6 +5449,7 @@ void kgsl_device_platform_remove(struct kgsl_device *device)
 		pm_qos_remove_request(&device->pwrctrl.l2pc_cpus_qos);
 
 	idr_destroy(&device->context_idr);
+	idr_destroy(&device->timelines);
 
 	kgsl_mmu_close(device);
 

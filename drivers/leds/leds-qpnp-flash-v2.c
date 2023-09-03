@@ -26,6 +26,8 @@
 #include <linux/log2.h>
 #include "leds.h"
 
+#define	FLASH_LED_REG_PERPH_SUBTYPE(base)		(base + 0x05)
+
 #define	FLASH_LED_REG_LED_STATUS1(base)		(base + 0x08)
 
 #define	FLASH_LED_REG_LED_STATUS2(base)		(base + 0x09)
@@ -133,6 +135,9 @@
 #define	FLASH_LED_REG_CURRENT_DERATE_EN(base)	(base + 0x76)
 #define	FLASH_LED_CURRENT_DERATE_EN_MASK	GENMASK(2, 0)
 
+#define	FLASH_LED_REG_CHICKEN_BITS(base)	(base + 0x87)
+#define	FLASH_LED_EN_ITAR_FLY_BIT	BIT(0)
+
 #define	VPH_DROOP_DEBOUNCE_US_TO_VAL(val_us)	(val_us / 8)
 #define	VPH_DROOP_HYST_MV_TO_VAL(val_mv)	(val_mv / 25)
 #define	VPH_DROOP_THRESH_VAL_TO_UV(val)		((val + 25) * 100000)
@@ -195,6 +200,13 @@
 
 /* notifier call chain for flash-led irqs */
 static ATOMIC_NOTIFIER_HEAD(irq_notifier_list);
+
+enum flash_led_subtype {
+	PMI8998_FLASH_SUBTYPE = 3,
+	PM660L_FLASH_SUBTYPE = 3,
+	PM6150L_FLASH_SUBTYPE,
+	PMI632_FLASH_SUBTYPE,
+};
 
 enum flash_charger_mitigation {
 	FLASH_DISABLE_CHARGER_MITIGATION,
@@ -307,6 +319,7 @@ struct flash_led_platform_data {
 	bool			hdrm_auto_mode_en;
 	bool			thermal_derate_en;
 	bool			otst_ramp_bkup_en;
+	bool			torch_realtime_brightness_control;
 };
 
 /*
@@ -331,6 +344,7 @@ struct qpnp_flash_led {
 	u16				base;
 	bool				trigger_lmh;
 	bool				trigger_chgr;
+	bool				torch_current_update;
 };
 
 static int thermal_derate_slow_table[] = {
@@ -701,6 +715,27 @@ static int qpnp_flash_led_init_settings(struct qpnp_flash_led *led)
 			led->pdata->iled_thrsh_val);
 	if (rc < 0)
 		return rc;
+
+	rc = qpnp_flash_led_read(led,
+			FLASH_LED_REG_PERPH_SUBTYPE(led->base),
+			&val);
+	if (rc < 0)
+		return rc;
+
+	/*
+	 * Updating torch current on-the-fly is possible
+	 * from PM6150L onwards.
+	 */
+	if (val >= PM6150L_FLASH_SUBTYPE) {
+		rc = qpnp_flash_led_masked_read(led,
+			FLASH_LED_REG_CHICKEN_BITS(led->base),
+			FLASH_LED_EN_ITAR_FLY_BIT,
+			&val);
+		if (rc < 0)
+			return rc;
+
+		led->torch_current_update = !!val;
+	}
 
 	if (led->pdata->led1n2_iclamp_low_ma) {
 		val = get_current_reg_code(led->pdata->led1n2_iclamp_low_ma,
@@ -1304,7 +1339,7 @@ static void qpnp_flash_led_aggregate_max_current(struct flash_node_data *fnode)
 
 static void qpnp_flash_led_node_set(struct flash_node_data *fnode, int value)
 {
-	int i = 0;
+	int i = 0, val, rc = 0, addr_offset;
 	int prgm_current_ma = value;
 	int min_ma = fnode->ires_ua / 1000;
 	struct qpnp_flash_led *led = dev_get_drvdata(&fnode->pdev->dev);
@@ -1349,6 +1384,31 @@ static void qpnp_flash_led_node_set(struct flash_node_data *fnode, int value)
 		led->trigger_chgr = false;
 		if (led->total_current_ma >= 1000)
 			led->trigger_chgr = true;
+	}
+
+	if (led->pdata->torch_realtime_brightness_control) {
+		val = 0;
+		for (i = 0; i < led->num_fnodes; i++)
+			if (led->fnode[i].led_on)
+				val |= led->fnode[i].ires_idx <<
+					(led->fnode[i].id * 2);
+
+		rc = qpnp_flash_led_masked_write(led,
+					FLASH_LED_REG_IRES(led->base),
+						FLASH_LED_CURRENT_MASK, val);
+		if (rc < 0)
+			return;
+		for (i = 0; i < led->num_fnodes; i++) {
+			if (led->fnode[i].led_on) {
+				addr_offset = led->fnode[i].id;
+				rc = qpnp_flash_led_masked_write(led,
+					FLASH_LED_REG_TGR_CURRENT(led->base +
+					addr_offset), FLASH_LED_CURRENT_MASK,
+					led->fnode[i].current_reg_val);
+				if (rc < 0)
+					return;
+			}
+		}
 	}
 }
 
@@ -1580,13 +1640,28 @@ static int qpnp_flash_led_module_enable(struct flash_switch_data *snode)
 static int qpnp_flash_led_switch_set(struct flash_switch_data *snode, bool on)
 {
 	struct qpnp_flash_led *led = dev_get_drvdata(&snode->pdev->dev);
+	struct flash_node_data fnode;
 	int rc, i, addr_offset;
 	u8 val, mask;
+	bool torch_current_update = false;
 
 	if (snode->enabled == on) {
-		pr_debug("Switch node is already %s!\n",
-			on ? "enabled" : "disabled");
-		return 0;
+		if (on && led->torch_current_update) {
+			for (i = 0; i < led->num_fnodes; i++) {
+				fnode = led->fnode[i];
+				if (snode->led_mask & BIT(fnode.id) &&
+						fnode.led_on) {
+					torch_current_update = (fnode.type ==
+						FLASH_LED_TYPE_TORCH);
+				}
+			}
+		}
+
+		if (!torch_current_update) {
+			pr_debug("Switch node is already %s!\n",
+				on ? "enabled" : "disabled");
+			return 0;
+		}
 	}
 
 	if (!on) {
@@ -1614,6 +1689,22 @@ static int qpnp_flash_led_switch_set(struct flash_switch_data *snode, bool on)
 						FLASH_LED_CURRENT_MASK, val);
 	if (rc < 0)
 		return rc;
+
+	if (torch_current_update) {
+		for (i = 0; i < led->num_fnodes; i++) {
+			if (snode->led_mask & BIT(led->fnode[i].id) &&
+					led->fnode[i].led_on) {
+				addr_offset = led->fnode[i].id;
+				rc = qpnp_flash_led_masked_write(led,
+					FLASH_LED_REG_TGR_CURRENT(led->base +
+					addr_offset), FLASH_LED_CURRENT_MASK,
+					led->fnode[i].current_reg_val);
+				if (rc < 0)
+					return rc;
+			}
+		}
+		return 0;
+	}
 
 	val = 0;
 	for (i = 0; i < led->num_fnodes; i++) {
@@ -2854,6 +2945,9 @@ static int qpnp_flash_led_parse_common_dt(struct qpnp_flash_led *led,
 
 	led->pdata->hdrm_auto_mode_en = of_property_read_bool(node,
 							"qcom,hdrm-auto-mode");
+	led->pdata->torch_realtime_brightness_control = of_property_read_bool(
+					node,
+					"qcom,torch-realtime-brightness-control");
 	rc = qpnp_flash_led_isc_delay_dt(led, node);
 	if (rc < 0)
 		return rc;
