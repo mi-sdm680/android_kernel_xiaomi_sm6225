@@ -5204,10 +5204,13 @@ static DEVICE_ATTR(doze_status, 0644,
 static DEVICE_ATTR(doze_mode, 0644,
 			sysfs_doze_mode_read,
 			sysfs_doze_mode_write);
+#endif
 
 static struct attribute *display_fs_attrs[] = {
+#ifdef CONFIG_TARGET_PROJECT_K7T
 	&dev_attr_doze_status.attr,
 	&dev_attr_doze_mode.attr,
+#endif
         &dev_attr_hbm.attr,
 	NULL,
 };
@@ -5227,7 +5230,6 @@ static int dsi_display_sysfs_init(struct dsi_display *display)
 	return rc;
 
 }
-#endif
 
 /**
  * dsi_display_bind - bind dsi device with controlling device
@@ -5297,13 +5299,11 @@ static int dsi_display_bind(struct device *dev,
 		goto error;
 	}
 
-#ifdef CONFIG_TARGET_PROJECT_K7T
 	rc = dsi_display_sysfs_init(display);
 	if (rc) {
 		DSI_ERR("[%s] sysfs init failed, rc=%d\n", display->name, rc);
 		goto error;
 	}
-#endif
 
 	atomic_set(&display->clkrate_change_pending, 0);
 	display->cached_clk_rate = 0;
