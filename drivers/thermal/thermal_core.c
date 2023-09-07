@@ -24,8 +24,8 @@
 #include <linux/suspend.h>
 #ifdef CONFIG_ARCH_QCOM
 #include <linux/cpu_cooling.h>
-#include <linux/msm_drm_notify.h>
-//#include <drm/drm_panel.h>
+//#include <linux/msm_drm_notify.h>
+#include <drm/drm_panel.h>
 #endif
 
 #define CREATE_TRACE_POINTS
@@ -1893,15 +1893,19 @@ static void destroy_thermal_message_node(void)
 
 static int screen_state_for_thermal_callback(struct notifier_block *nb, unsigned long val, void *data)
 {
-	struct msm_drm_notifier *evdata = data;
+	struct drm_notify_data *evdata = data;
 	unsigned int blank;
 
-	if (val != MSM_DRM_EVENT_BLANK || !evdata || !evdata->data)
+	if (val != DRM_EVENT_BLANK || !evdata || !evdata->data)
 		return 0;
 
 	blank = *(int *)(evdata->data);
 	switch (blank) {
-	case MSM_DRM_BLANK_POWERDOWN:
+	case DRM_BLANK_LP1:
+		pr_warn("%s: DRM_BLANK_LP1\n", __func__);
+	case DRM_BLANK_LP2:
+		pr_warn("%s: DRM_BLANK_LP2\n", __func__);
+	case DRM_BLANK_POWERDOWN:
 		sm.screen_state = 0;
 		pr_debug("%s: DRM_BLANK_POWERDOWN\n", __func__);
 #ifdef CONFIG_TARGET_PROJECT_C3Q
@@ -1909,7 +1913,7 @@ static int screen_state_for_thermal_callback(struct notifier_block *nb, unsigned
 		fts_ts_suspend_execute(); //fts_ts-suspend
 #endif
 		break;
-	case MSM_DRM_BLANK_UNBLANK:
+	case DRM_BLANK_UNBLANK:
 		sm.screen_state = 1;
 		pr_debug("%s: DRM_BLANK_UNBLANK\n", __func__);
 #ifdef CONFIG_TARGET_PROJECT_C3Q
@@ -1988,7 +1992,7 @@ static int __init thermal_init(void)
 			result);
 
 	sm.thermal_notifier.notifier_call = screen_state_for_thermal_callback;
-	if (msm_drm_register_client(&sm.thermal_notifier) < 0) {
+	if (drm_register_client(&sm.thermal_notifier) < 0) {
 		pr_warn("Thermal: register screen state callback failed\n");
 	}
 #endif
@@ -2012,9 +2016,8 @@ error:
 
 static void thermal_exit(void)
 {
-
 #ifdef CONFIG_ARCH_QCOM
-	msm_drm_unregister_client(&sm.thermal_notifier);
+	drm_unregister_client(&sm.thermal_notifier);
 #endif
 	unregister_pm_notifier(&thermal_pm_nb);
 	of_thermal_destroy_zones();
