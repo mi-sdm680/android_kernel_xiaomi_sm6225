@@ -479,6 +479,10 @@ static void dsi_bridge_post_disable(struct drm_bridge *bridge)
 	}
 	SDE_ATRACE_END("dsi_bridge_post_disable");
 
+        /*add for thermal begin*/
+        drm_notifier_call_chain(DRM_EVENT_BLANK, &g_notify_data);
+        /*add for thermal end*/
+
 #ifdef CONFIG_TARGET_PROJECT_C3Q
 	if (c_bridge->display->is_prim_display)
 		atomic_set(&prim_panel_is_on, false);
@@ -512,10 +516,6 @@ static void prim_panel_off_delayed_work(struct work_struct *work)
 	}
 	mutex_unlock(&gbridge->base.lock);
 #endif
-
-	/*add for thermal begin*/
-	drm_notifier_call_chain(DRM_EVENT_BLANK, &g_notify_data);
-	/*add for thermal end*/
 }
 
 static void dsi_bridge_mode_set(struct drm_bridge *bridge,
