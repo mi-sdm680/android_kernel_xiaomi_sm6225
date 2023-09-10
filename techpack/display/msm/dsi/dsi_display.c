@@ -5320,7 +5320,7 @@ static int dsi_display_read_reg(struct dsi_display_ctrl *ctrl, char cmd0,
 	}
 	cmds->msg.rx_buf = rbuf;
 	cmds->msg.rx_len = len;
-	rc = dsi_ctrl_cmd_transfer(ctrl->ctrl, &cmds->msg, flags);
+	rc = dsi_ctrl_cmd_transfer(ctrl->ctrl, &cmds->msg, &flags);
 	if (rc <= 0) {
 		DSI_ERR("rx cmd transfer failed rc=%d\n", rc);
 		return rc;
@@ -5362,7 +5362,7 @@ static int dsi_display_write_reg_page(struct dsi_display_ctrl *ctrl, char cmd0,
 	}
 	cmds->msg.rx_buf = NULL;
 	cmds->msg.rx_len = 0;
-	rc = dsi_ctrl_cmd_transfer(ctrl->ctrl, &cmds->msg, flags);
+	rc = dsi_ctrl_cmd_transfer(ctrl->ctrl, &cmds->msg, &flags);
 	if (rc < 0) {
 		DSI_ERR("rx cmd transfer failed rc=%d\n", rc);
 		return rc;
