@@ -65,6 +65,8 @@
 #define FTS_I2C_VTG_MAX_UV                  1800000
 #endif
 
+static bool fts_ts_enable = false;
+
 //enable "check touch vendor" feature
 #define CHECK_TOUCH_VENDOR
 #ifdef CHECK_TOUCH_VENDOR
@@ -1304,6 +1306,28 @@ static int fts_parse_dt(struct device *dev, struct fts_ts_platform_data *pdata)
     return 0;
 }
 
+void fts_ts_suspend_execute(void)
+{
+	if (fts_ts_enable)
+	{
+		FTS_INFO("run fts suspend\n");
+		fts_ts_suspend(&fts_data->client->dev);
+	}
+
+}
+EXPORT_SYMBOL(fts_ts_suspend_execute);
+
+void fts_ts_resume_execute(void)
+{
+	if (fts_ts_enable)
+	{
+		FTS_INFO("run fts resume\n");
+		fts_ts_resume(&fts_data->client->dev);
+
+	}
+}
+EXPORT_SYMBOL(fts_ts_resume_execute);
+
 static void fts_resume_work(struct work_struct *work)
 {
     struct fts_ts_data *ts_data = container_of(work, struct fts_ts_data,
@@ -1947,6 +1971,7 @@ static int fts_ts_probe(struct spi_device *spi)
         return ret;
     }
 
+    fts_ts_enable = true;
     FTS_INFO("Touch Screen(SPI BUS) driver prboe successfully");
     return 0;
 }

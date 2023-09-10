@@ -44,6 +44,8 @@
 #include <linux/jiffies.h>
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
 
+static bool nvt_ts_enable = false;
+
 #ifdef CHECK_TOUCH_VENDOR
 extern char *saved_command_line;
 
@@ -210,6 +212,27 @@ int nvt_ts_recovery_callback(void)
 EXPORT_SYMBOL(nvt_ts_recovery_callback);
 
 #endif
+
+void nvt_ts_suspend_execute(void)
+{
+	if (nvt_ts_enable)
+	{
+		NVT_LOG("run nvt suspend\n");
+		nvt_ts_suspend(&ts->client->dev);
+	}
+
+}
+EXPORT_SYMBOL(nvt_ts_suspend_execute);
+
+void nvt_ts_resume_execute(void)
+{
+	if (nvt_ts_enable)
+	{
+		NVT_LOG("run nvt resume\n");
+		nvt_ts_resume(&ts->client->dev);
+	}
+}
+EXPORT_SYMBOL(nvt_ts_resume_execute);
 
 /*2019.12.6 longcheer taocheng add charger mode begin*/
 /*function description*/
@@ -3084,6 +3107,9 @@ static int32_t __init nvt_driver_init(void)
 	} else {
 		if (strstr(saved_command_line,"c3q_35_02_0a") != NULL) {
 			touch_vendor_id = TP_VENDOR_BOE;
+#ifdef CONFIG_TARGET_PROJECT_C3Q
+			nvt_ts_enable = true;
+#endif
 			NVT_LOG("TP info: [Vendor]BOE [IC]nt36525b\n");
 		} else {
 			touch_vendor_id = TP_VENDOR_UNKNOW;
