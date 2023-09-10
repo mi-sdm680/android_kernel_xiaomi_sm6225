@@ -71,6 +71,9 @@
 #define TP_VENDOR_UNKNOW  0X00
 #define TP_VENDOR_BOE     0X01
 
+//new qcom platform use
+#define _MSM_DRM_NOTIFY_H_
+
 #if NVT_DEBUG
 #define NVT_LOG(fmt, args...)    pr_err("[%s] %s %d: " fmt, NVT_SPI_NAME, __func__, __LINE__, ##args)
 #else
