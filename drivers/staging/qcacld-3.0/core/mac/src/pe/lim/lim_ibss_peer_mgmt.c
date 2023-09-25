@@ -22,6 +22,7 @@
 #include "wni_cfg.h"
 #include "lim_utils.h"
 #include "lim_assoc_utils.h"
+#include "lim_sta_hash_api.h"
 #include "sch_api.h"             /* sch_set_fixed_beacon_fields for IBSS coalesce */
 #include "lim_security_utils.h"
 #include "lim_send_messages.h"
@@ -459,7 +460,7 @@ ibss_dph_entry_add(struct mac_context *mac,
 /* send a status change notification */
 static void
 ibss_status_chg_notify(struct mac_context *mac, tSirMacAddr peerAddr,
-		       uint16_t status, uint8_t sessionId)
+		       uint16_t staIndex, uint16_t status, uint8_t sessionId)
 {
 
 	tLimIbssPeerNode *peerNode;
@@ -476,7 +477,7 @@ ibss_status_chg_notify(struct mac_context *mac, tSirMacAddr peerAddr,
 		peerNode->beaconLen = 0;
 	}
 
-	lim_send_sme_ibss_peer_ind(mac, peerAddr,
+	lim_send_sme_ibss_peer_ind(mac, peerAddr, staIndex,
 				   beacon, bcnLen, status, sessionId);
 
 	if (beacon) {
@@ -567,7 +568,7 @@ void ibss_bss_add(struct mac_context *mac, struct pe_session *pe_session)
 	mlmStartReq.txChannelWidthSet = pe_session->htRecommendedTxWidthSet;
 
 	/* reading the channel num from session Table */
-	mlmStartReq.oper_ch_freq = pe_session->curr_op_freq;
+	mlmStartReq.channelNumber = pe_session->currentOperChannel;
 
 	mlmStartReq.cbMode = pe_session->pLimStartBssReq->cbMode;
 
@@ -601,9 +602,9 @@ void ibss_bss_delete(struct mac_context *mac_ctx, struct pe_session *session)
 			session->limMlmState);
 		return;
 	}
-	status = lim_del_bss(mac_ctx, NULL, session->vdev_id, session);
+	status = lim_del_bss(mac_ctx, NULL, session->bss_idx, session);
 	if (QDF_IS_STATUS_ERROR(status))
-		pe_err("delBss failed for bss: %d", session->vdev_id);
+		pe_err("delBss failed for bss: %d", session->bss_idx);
 }
 
 /**
@@ -672,6 +673,7 @@ void lim_ibss_delete_all_peers(struct mac_context *mac,
 		if (sta) {
 
 			ibss_status_chg_notify(mac, pCurrNode->peerMacAddr,
+					       sta->staIndex,
 					       eWNI_SME_IBSS_PEER_DEPARTED_IND,
 					       pe_session->smeSessionId);
 			lim_del_sta(mac, sta, false, pe_session);
@@ -824,7 +826,7 @@ lim_ibss_decide_protection(struct mac_context *mac, tpDphHashNode sta,
 			   tpUpdateBeaconParams pBeaconParams,
 			   struct pe_session *pe_session)
 {
-	enum reg_wifi_band rfBand = REG_BAND_UNKNOWN;
+	enum band_info rfBand = BAND_UNKNOWN;
 	uint32_t phyMode;
 	tLimProtStaCacheType protStaCacheType =
 		eLIM_PROT_STA_CACHE_TYPE_INVALID;
@@ -837,7 +839,7 @@ lim_ibss_decide_protection(struct mac_context *mac, tpDphHashNode sta,
 	}
 
 	lim_get_rf_band_new(mac, &rfBand, pe_session);
-	if (REG_BAND_2G == rfBand) {
+	if (BAND_2G == rfBand) {
 		lim_get_phy_mode(mac, &phyMode, pe_session);
 
 		/* We are 11G or 11n. Check if we need protection from 11b Stations. */
@@ -862,10 +864,51 @@ lim_ibss_decide_protection(struct mac_context *mac, tpDphHashNode sta,
 	return;
 }
 
+/**
+ * lim_ibss_peer_find()
+ *
+ ***FUNCTION:
+ * This function is called while adding a context at
+ * DPH & Polaris for a peer in IBSS.
+ * If peer is found in the list, capabilities from the
+ * returned BSS description are used at DPH node & Polaris.
+ *
+ ***LOGIC:
+ *
+ ***ASSUMPTIONS:
+ *
+ ***NOTE:
+ *
+ * @param  macAddr - MAC address of the peer
+ *
+ * @return Pointer to peer node if found, else NULL
+ */
 tLimIbssPeerNode *lim_ibss_peer_find(struct mac_context *mac, tSirMacAddr macAddr)
 {
 	return ibss_peer_find(mac, macAddr);
 }
+
+/**
+ * lim_ibss_sta_add()
+ *
+ ***FUNCTION:
+ * This function is called to add an STA context in IBSS role
+ * whenever a data frame is received from/for a STA that failed
+ * hash lookup at DPH.
+ *
+ ***LOGIC:
+ *
+ ***ASSUMPTIONS:
+ * NA
+ *
+ ***NOTE:
+ * NA
+ *
+ * @param  mac       Pointer to Global MAC structure
+ * @param  peerAdddr  MAC address of the peer being added
+ * @return retCode    Indicates success or failure return code
+ * @return
+ */
 
 QDF_STATUS
 lim_ibss_sta_add(struct mac_context *mac, void *pBody, struct pe_session *pe_session)
@@ -922,7 +965,7 @@ lim_ibss_sta_add(struct mac_context *mac, void *pBody, struct pe_session *pe_ses
 					sch_set_fixed_beacon_fields(mac,
 								    pe_session);
 					beaconParams.bss_idx =
-						pe_session->vdev_id;
+						pe_session->bss_idx;
 					lim_send_beacon_params(mac, &beaconParams,
 							       pe_session);
 				}
@@ -961,8 +1004,8 @@ lim_ibss_search_and_delete_peer(struct mac_context *mac_ctx,
 
 	prev_node = temp_node = mac_ctx->lim.gLimIbssPeerList;
 
-	pe_debug(" PEER ADDR :" QDF_MAC_ADDR_FMT,
-		QDF_MAC_ADDR_REF(mac_addr));
+	pe_debug(" PEER ADDR :" QDF_MAC_ADDR_STR,
+		QDF_MAC_ADDR_ARRAY(mac_addr));
 
 	/** Compare Peer */
 	while (temp_node) {
@@ -1008,7 +1051,6 @@ lim_ibss_search_and_delete_peer(struct mac_context *mac_ctx,
  * @mac_ptr: Pointer to Global MAC structure
  * @session_entry: Session entry
  * @mac_addr: Mac Address of the IBSS peer
- * @del_sta: del sta sent to firmware if true
  *
  * This function is called delete IBSS peer.
  *
@@ -1017,14 +1059,13 @@ lim_ibss_search_and_delete_peer(struct mac_context *mac_ctx,
  */
 static void
 lim_ibss_delete_peer(struct mac_context *mac_ctx,
-			struct pe_session *session_entry, tSirMacAddr mac_addr,
-			bool del_sta)
+			struct pe_session *session_entry, tSirMacAddr mac_addr)
 {
 	tpDphHashNode sta = NULL;
 	uint16_t peer_idx = 0;
 
-	pe_debug("Delete peer :" QDF_MAC_ADDR_FMT,
-		QDF_MAC_ADDR_REF(mac_addr));
+	pe_debug("Delete peer :" QDF_MAC_ADDR_STR,
+		QDF_MAC_ADDR_ARRAY(mac_addr));
 
 	sta = dph_lookup_hash_entry(mac_ctx, mac_addr,
 			&peer_idx,
@@ -1032,12 +1073,12 @@ lim_ibss_delete_peer(struct mac_context *mac_ctx,
 			dphHashTable);
 
 	if (!sta) {
-		pe_err("DPH Entry for STA "QDF_MAC_ADDR_FMT" is missing",
-			QDF_MAC_ADDR_REF(mac_addr));
+		pe_err("DPH Entry for STA %pM is missing",
+			mac_addr);
 		return;
 	}
 
-	if (del_sta) {
+	if (STA_INVALID_IDX != sta->staIndex) {
 		lim_del_sta(mac_ctx, sta,
 			  true, session_entry);
 	} else {
@@ -1088,9 +1129,9 @@ void lim_process_ibss_del_sta_rsp(struct mac_context *mac_ctx,
 		status = eSIR_SME_REFUSED;
 		goto skip_event;
 	}
-	pe_debug("Deleted STA associd %d MAC " QDF_MAC_ADDR_FMT,
-		sta_ds->assocId,
-		QDF_MAC_ADDR_REF(sta_ds->staAddr));
+	pe_debug("Deleted STA associd %d staId %d MAC " QDF_MAC_ADDR_STR,
+		sta_ds->assocId, sta_ds->staIndex,
+		QDF_MAC_ADDR_ARRAY(sta_ds->staAddr));
 
 	lim_delete_dph_hash_entry(mac_ctx, sta_ds->staAddr,
 			  del_sta_params->assocId, pe_session);
@@ -1099,6 +1140,7 @@ void lim_process_ibss_del_sta_rsp(struct mac_context *mac_ctx,
 
 	ibss_status_chg_notify(mac_ctx,
 		del_sta_params->staMac,
+		sta_ds->staIndex,
 		eWNI_SME_IBSS_PEER_DEPARTED_IND,
 		pe_session->smeSessionId);
 
@@ -1128,28 +1170,31 @@ lim_ibss_add_sta_rsp(struct mac_context *mac, void *msg, struct pe_session *pe_s
 		dph_lookup_hash_entry(mac, pAddStaParams->staMac, &peerIdx,
 				      &pe_session->dph.dphHashTable);
 	if (!sta) {
-		pe_err("IBSS: ADD_STA_RSP for unknown MAC addr: "QDF_MAC_ADDR_FMT,
-			QDF_MAC_ADDR_REF(pAddStaParams->staMac));
+		pe_err("IBSS: ADD_STA_RSP for unknown MAC addr: "QDF_MAC_ADDR_STR,
+			QDF_MAC_ADDR_ARRAY(pAddStaParams->staMac));
 		qdf_mem_free(pAddStaParams);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	if (pAddStaParams->status != QDF_STATUS_SUCCESS) {
-		pe_err("IBSS: ADD_STA_RSP error: %x for MAC:"QDF_MAC_ADDR_FMT,
+		pe_err("IBSS: ADD_STA_RSP error: %x for MAC:"QDF_MAC_ADDR_STR,
 			pAddStaParams->status,
-			QDF_MAC_ADDR_REF(pAddStaParams->staMac));
+			QDF_MAC_ADDR_ARRAY(pAddStaParams->staMac));
 		lim_ibss_delete_peer(mac,
-			pe_session, pAddStaParams->staMac, false);
+			pe_session, pAddStaParams->staMac);
 		qdf_mem_free(pAddStaParams);
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	sta->bssId = pAddStaParams->bss_idx;
+	sta->staIndex = pAddStaParams->staIdx;
 	sta->valid = 1;
 	sta->mlmStaContext.mlmState = eLIM_MLM_LINK_ESTABLISHED_STATE;
 
 	pe_debug("IBSS: sending IBSS_NEW_PEER msg to SME!");
 
 	ibss_status_chg_notify(mac, pAddStaParams->staMac,
+			       sta->staIndex,
 			       eWNI_SME_IBSS_NEW_PEER_IND,
 			       pe_session->smeSessionId);
 
@@ -1158,34 +1203,38 @@ lim_ibss_add_sta_rsp(struct mac_context *mac, void *msg, struct pe_session *pe_s
 	return QDF_STATUS_SUCCESS;
 }
 
-void lim_ibss_del_bss_rsp_when_coalescing(struct mac_context *mac,
-					  struct del_bss_resp *vdev_stop_rsp,
+void lim_ibss_del_bss_rsp_when_coalescing(struct mac_context *mac, void *msg,
 					  struct pe_session *pe_session)
 {
+	tpDeleteBssParams pDelBss = (tpDeleteBssParams) msg;
+
 	pe_debug("IBSS: DEL_BSS_RSP Rcvd during coalescing!");
 
-	if (!vdev_stop_rsp) {
+	if (!pDelBss) {
 		pe_err("IBSS: DEL_BSS_RSP(coalesce) with no body!");
-		return;
+		goto end;
 	}
 
-	if (vdev_stop_rsp->status != QDF_STATUS_SUCCESS) {
-		pe_err("IBSS: DEL_BSS_RSP(coalesce) error: %x",
-		       vdev_stop_rsp->status);
-		return;
+	if (pDelBss->status != QDF_STATUS_SUCCESS) {
+		pe_err("IBSS: DEL_BSS_RSP(coalesce) error: %x Bss: %d",
+			pDelBss->status, pDelBss->bss_idx);
+		goto end;
 	}
 
 	/* Delete peer entries. */
 	/* add the new bss */
 	ibss_bss_add(mac, pe_session);
+end:
+	if (pDelBss)
+		qdf_mem_free(pDelBss);
 }
 
-void lim_ibss_add_bss_rsp_when_coalescing(struct mac_context *mac,
-					  uint32_t op_chan_freq,
+void lim_ibss_add_bss_rsp_when_coalescing(struct mac_context *mac, void *msg,
 					  struct pe_session *pe_session)
 {
 	uint8_t infoLen;
 	struct new_bss_info newBssInfo;
+	tpAddBssParams pAddBss = msg;
 	tpSirMacMgmtHdr pHdr = mac->lim.ibss_info.mac_hdr;
 	tpSchBeaconStruct pBeacon = mac->lim.ibss_info.beacon;
 
@@ -1199,7 +1248,7 @@ void lim_ibss_add_bss_rsp_when_coalescing(struct mac_context *mac,
 
 	qdf_mem_zero((void *)&newBssInfo, sizeof(newBssInfo));
 	qdf_mem_copy(newBssInfo.bssId.bytes, pHdr->bssId, QDF_MAC_ADDR_SIZE);
-	newBssInfo.freq = op_chan_freq;
+	newBssInfo.channelNumber = (tSirMacChanNum) pAddBss->currentOperChannel;
 	qdf_mem_copy((uint8_t *) &newBssInfo.ssId,
 		     (uint8_t *) &pBeacon->ssId, pBeacon->ssId.length + 1);
 
@@ -1217,20 +1266,20 @@ end:
 	ibss_coalesce_free(mac);
 }
 
-void lim_ibss_del_bss_rsp(struct mac_context *mac,
-			  struct del_bss_resp *vdev_stop_rsp,
-			  struct pe_session *pe_session)
+void lim_ibss_del_bss_rsp(struct mac_context *mac, void *msg, struct pe_session *pe_session)
 {
 	tSirResultCodes rc = eSIR_SME_SUCCESS;
+	tpDeleteBssParams pDelBss = (tpDeleteBssParams) msg;
+	tSirMacAddr nullBssid = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
 	SET_LIM_PROCESS_DEFD_MESGS(mac, true);
-	if (!vdev_stop_rsp) {
+	if (!pDelBss) {
 		pe_err("IBSS: DEL_BSS_RSP with no body!");
 		rc = eSIR_SME_REFUSED;
 		goto end;
 	}
 
-	pe_session = pe_find_session_by_vdev_id(mac, vdev_stop_rsp->vdev_id);
+	pe_session = pe_find_session_by_session_id(mac, pDelBss->sessionId);
 	if (!pe_session) {
 		pe_err("Session Does not exist for given sessionID");
 		goto end;
@@ -1243,14 +1292,23 @@ void lim_ibss_del_bss_rsp(struct mac_context *mac,
 	 * 'IDLE' and gLimIbssCoalescingHappened flag will be false. In this case STOP BSS RSP has to be sent to SME.
 	 */
 	if (true == mac->lim.gLimIbssCoalescingHappened) {
-		lim_ibss_del_bss_rsp_when_coalescing(mac, vdev_stop_rsp,
-						     pe_session);
+
+		lim_ibss_del_bss_rsp_when_coalescing(mac, msg, pe_session);
 		return;
 	}
 
-	if (vdev_stop_rsp->status != QDF_STATUS_SUCCESS) {
-		pe_err("IBSS: DEL_BSS_RSP error: %x", vdev_stop_rsp->status);
+	if (pDelBss->status != QDF_STATUS_SUCCESS) {
+		pe_err("IBSS: DEL_BSS_RSP error: %x Bss: %d",
+			       pDelBss->status, pDelBss->bss_idx);
 		rc = eSIR_SME_STOP_BSS_FAILURE;
+		goto end;
+	}
+
+	if (lim_set_link_state(mac, eSIR_LINK_IDLE_STATE, nullBssid,
+			       pe_session->self_mac_addr, NULL,
+			       NULL) != QDF_STATUS_SUCCESS) {
+		pe_err("IBSS: DEL_BSS_RSP setLinkState failed");
+		rc = eSIR_SME_REFUSED;
 		goto end;
 	}
 
@@ -1274,6 +1332,8 @@ void lim_ibss_del_bss_rsp(struct mac_context *mac,
 		cfg_default(CFG_SHORT_SLOT_TIME_ENABLED);
 
 end:
+	if (pDelBss)
+		qdf_mem_free(pDelBss);
 	/* Delete PE session once BSS is deleted */
 	if (pe_session) {
 		lim_send_sme_rsp(mac, eWNI_SME_STOP_BSS_RSP, rc,
@@ -1297,6 +1357,26 @@ static void lim_ibss_bss_delete(struct mac_context *mac,
 		pe_err("Deliver WLAN_VDEV_SM_EV_DOWN failed");
 }
 
+/**
+ * lim_ibss_coalesce()
+ *
+ ***FUNCTION:
+ * This function is called upon receiving Beacon/Probe Response
+ * while operating in IBSS mode.
+ *
+ ***LOGIC:
+ *
+ ***ASSUMPTIONS:
+ *
+ ***NOTE:
+ *
+ * @param  mac    - Pointer to Global MAC structure
+ * @param  pBeacon - Parsed Beacon Frame structure
+ * @param  pBD     - Pointer to received BD
+ *
+ * @return Status whether to process or ignore received Beacon Frame
+ */
+
 QDF_STATUS
 lim_ibss_coalesce(struct mac_context *mac,
 		  tpSirMacMgmtHdr pHdr,
@@ -1314,9 +1394,9 @@ lim_ibss_coalesce(struct mac_context *mac,
 
 	sir_copy_mac_addr(currentBssId, pe_session->bssId);
 
-	pe_debug("Current BSSID :" QDF_MAC_ADDR_FMT " Received BSSID :"
-		   QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(currentBssId),
-		QDF_MAC_ADDR_REF(pHdr->bssId));
+	pe_debug("Current BSSID :" QDF_MAC_ADDR_STR " Received BSSID :"
+		   QDF_MAC_ADDR_STR, QDF_MAC_ADDR_ARRAY(currentBssId),
+		QDF_MAC_ADDR_ARRAY(pHdr->bssId));
 
 	/* Check for IBSS Coalescing only if Beacon is from different BSS */
 	if (qdf_mem_cmp(currentBssId, pHdr->bssId, sizeof(tSirMacAddr))
@@ -1334,7 +1414,7 @@ lim_ibss_coalesce(struct mac_context *mac,
 		pPeerNode = ibss_peer_find(mac, pHdr->sa);
 		if (pPeerNode) {
 			lim_ibss_delete_peer(mac, pe_session,
-							  pHdr->sa, true);
+							  pHdr->sa);
 			pe_warn("Peer attempting to reconnect before HB timeout, deleted");
 			return QDF_STATUS_E_INVAL;
 		}
@@ -1350,8 +1430,8 @@ lim_ibss_coalesce(struct mac_context *mac,
 		 */
 		mac->lim.gLimIbssCoalescingHappened = true;
 		ibss_coalesce_save(mac, pHdr, pBeacon);
-		pe_debug("IBSS Coalescing happened Delete BSSID :" QDF_MAC_ADDR_FMT,
-			QDF_MAC_ADDR_REF(currentBssId));
+		pe_debug("IBSS Coalescing happened Delete BSSID :" QDF_MAC_ADDR_STR,
+			QDF_MAC_ADDR_ARRAY(currentBssId));
 		lim_ibss_bss_delete(mac, pe_session);
 
 		return QDF_STATUS_SUCCESS;
@@ -1434,7 +1514,7 @@ lim_ibss_coalesce(struct mac_context *mac,
 		if (beaconParams.paramChangeBitmap) {
 			pe_err("beaconParams.paramChangeBitmap=1 ---> Update Beacon Params");
 			sch_set_fixed_beacon_fields(mac, pe_session);
-			beaconParams.bss_idx = pe_session->vdev_id;
+			beaconParams.bss_idx = pe_session->bss_idx;
 			lim_send_beacon_params(mac, &beaconParams, pe_session);
 		}
 	} else
@@ -1457,6 +1537,16 @@ lim_ibss_coalesce(struct mac_context *mac,
 	return QDF_STATUS_SUCCESS;
 } /*** end lim_handle_ibs_scoalescing() ***/
 
+/**
+ * lim_ibss_heart_beat_handle() - handle IBSS hearbeat failure
+ *
+ * @mac_ctx: global mac context
+ * @session: PE session entry
+ *
+ * Hanlde IBSS hearbeat failure.
+ *
+ * Return: None.
+ */
 void lim_ibss_heart_beat_handle(struct mac_context *mac_ctx, struct pe_session *session)
 {
 	tLimIbssPeerNode *tempnode, *prevnode;
@@ -1464,6 +1554,7 @@ void lim_ibss_heart_beat_handle(struct mac_context *mac_ctx, struct pe_session *
 	uint16_t peer_idx = 0;
 	tpDphHashNode stads = 0;
 	uint32_t threshold = 0;
+	uint16_t sta_idx = 0;
 
 	/*
 	 * MLM BSS is started and if PE in scanmode then MLM state will be
@@ -1502,6 +1593,8 @@ void lim_ibss_heart_beat_handle(struct mac_context *mac_ctx, struct pe_session *
 					tempnode->peerMacAddr, &peer_idx,
 					&session->dph.dphHashTable);
 			if (stads) {
+				sta_idx = stads->staIndex;
+
 				(void)lim_del_sta(mac_ctx, stads, false,
 						  session);
 				lim_delete_dph_hash_entry(mac_ctx,
@@ -1510,7 +1603,7 @@ void lim_ibss_heart_beat_handle(struct mac_context *mac_ctx, struct pe_session *
 						     session);
 				/* Send indication. */
 				ibss_status_chg_notify(mac_ctx,
-					tempnode->peerMacAddr,
+					tempnode->peerMacAddr, sta_idx,
 					eWNI_SME_IBSS_PEER_DEPARTED_IND,
 					session->smeSessionId);
 			}
@@ -1569,6 +1662,18 @@ void lim_ibss_heart_beat_handle(struct mac_context *mac_ctx, struct pe_session *
 	}
 }
 
+/**
+ * lim_ibss_decide_protection_on_delete() - decides protection related info.
+ *
+ * @mac_ctx: global mac context
+ * @stads: station hash node
+ * @bcn_param: beacon parameters
+ * @session: PE session entry
+ *
+ * Decides all the protection related information.
+ *
+ * Return: None
+ */
 void lim_ibss_decide_protection_on_delete(struct mac_context *mac_ctx,
 					  tpDphHashNode stads,
 					  tpUpdateBeaconParams bcn_param,
@@ -1576,14 +1681,14 @@ void lim_ibss_decide_protection_on_delete(struct mac_context *mac_ctx,
 {
 	uint32_t phymode;
 	tHalBitVal erpenabled = eHAL_CLEAR;
-	enum reg_wifi_band rfband = REG_BAND_UNKNOWN;
+	enum band_info rfband = BAND_UNKNOWN;
 	uint32_t i;
 
 	if (!stads)
 		return;
 
 	lim_get_rf_band_new(mac_ctx, &rfband, session);
-	if (REG_BAND_2G != rfband)
+	if (BAND_2G != rfband)
 		return;
 
 	lim_get_phy_mode(mac_ctx, &phymode, session);
@@ -1634,7 +1739,7 @@ __lim_ibss_peer_inactivity_handler(struct mac_context *mac,
 	}
 
 	/* delete the peer for which heartbeat is observed */
-	lim_ibss_delete_peer(mac, pe_session, ind->peer_addr.bytes, true);
+	lim_ibss_delete_peer(mac, pe_session, ind->peer_addr.bytes);
 }
 
 /** -------------------------------------------------------------

@@ -70,18 +70,14 @@
 #endif /* QCA_WIFI_3_0 */
 
 #if HTT_PADDR64
-#define HTT_TX_DESC_FRAG_FIELD_UPDATE(frag_filed_ptr, frag_desc_addr)          \
+#define HTT_TX_DESC_FRAG_FIELD_HI_UPDATE(frag_filed_ptr)                       \
 do {                                                                           \
-	*frag_filed_ptr = qdf_get_lower_32_bits(frag_desc_addr);               \
 	frag_filed_ptr++;                                                      \
 	/* frags_desc_ptr.hi */                                                \
-	*frag_filed_ptr = qdf_get_upper_32_bits(frag_desc_addr) & 0x1F;        \
+	*frag_filed_ptr = 0;                                                   \
 } while (0)
 #else
-#define HTT_TX_DESC_FRAG_FIELD_UPDATE(frag_filed_ptr, frag_desc_addr)          \
-do {                                                                           \
-	*frag_filed_ptr = qdf_get_lower_32_bits(frag_desc_addr);               \
-} while (0)
+#define HTT_TX_DESC_FRAG_FIELD_HI_UPDATE(frag_filed_ptr) {}
 #endif
 
 /*--- setup / tear-down functions -------------------------------------------*/
@@ -138,14 +134,13 @@ static void htt_tx_frag_desc_field_update(struct htt_pdev_t *pdev,
 	unsigned int target_page;
 	unsigned int offset;
 	struct qdf_mem_dma_page_t *dma_page;
-	qdf_dma_addr_t frag_desc_addr;
 
 	target_page = index / pdev->frag_descs.desc_pages.num_element_per_page;
 	offset = index % pdev->frag_descs.desc_pages.num_element_per_page;
 	dma_page = &pdev->frag_descs.desc_pages.dma_pages[target_page];
-	frag_desc_addr = (dma_page->page_p_addr +
+	*fptr = (uint32_t)(dma_page->page_p_addr +
 		offset * pdev->frag_descs.size);
-	HTT_TX_DESC_FRAG_FIELD_UPDATE(fptr, frag_desc_addr);
+	HTT_TX_DESC_FRAG_FIELD_HI_UPDATE(fptr);
 }
 
 /**
@@ -870,42 +865,7 @@ htt_tx_send_nonstd(htt_pdev_handle pdev,
 	return htt_tx_send_std(pdev, msdu, msdu_id);
 }
 
-#ifndef QCA_TX_PADDING_CREDIT_SUPPORT
-int htt_tx_padding_credit_update_handler(void *context, int pad_credit)
-{
-	return 1;
-}
-#endif
-
 #else                           /*ATH_11AC_TXCOMPACT */
-
-#ifdef QCA_TX_PADDING_CREDIT_SUPPORT
-static int htt_tx_padding_credit_update(htt_pdev_handle htt_pdev,
-					int pad_credit)
-{
-	int ret = 0;
-
-	if (pad_credit)
-		qdf_atomic_add(pad_credit,
-			       &htt_pdev->txrx_pdev->pad_reserve_tx_credit);
-
-	ret = qdf_atomic_read(&htt_pdev->txrx_pdev->pad_reserve_tx_credit);
-
-	return ret;
-}
-
-int htt_tx_padding_credit_update_handler(void *context, int pad_credit)
-{
-	struct htt_pdev_t *htt_pdev = (struct htt_pdev_t *)context;
-
-	return htt_tx_padding_credit_update(htt_pdev, pad_credit);
-}
-#else
-int htt_tx_padding_credit_update_handler(void *context, int pad_credit)
-{
-	return 1;
-}
-#endif
 
 #ifdef QCA_TX_HTT2_SUPPORT
 static inline HTC_ENDPOINT_ID

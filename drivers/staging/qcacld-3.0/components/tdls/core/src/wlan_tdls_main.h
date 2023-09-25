@@ -94,13 +94,13 @@
 /**
  * struct tdls_conn_info - TDLS connection record
  * @session_id: session id
- * @valid_entry: valid entry(set to true upon peer create resp from firmware)
+ * @sta_id: sta id
  * @peer_mac: peer address
  * @index: index to store array offset.
  */
 struct tdls_conn_info {
 	uint8_t session_id;
-	bool valid_entry;
+	uint8_t sta_id;
 	uint8_t index;
 	struct qdf_mac_addr peer_mac;
 };
@@ -165,7 +165,6 @@ struct tdls_set_state_info {
  * @tdls_external_peer_count: external tdls peer count
  * @tdls_nss_switch_in_progress: tdls antenna switch in progress
  * @tdls_nss_teardown_complete: tdls tear down complete
- * @tdls_disable_in_progress: tdls is disable in progress
  * @tdls_nss_transition_mode: tdls nss transition mode
  * @tdls_teardown_peers_cnt: tdls tear down peer count
  * @set_state_info: set tdls state info
@@ -173,6 +172,7 @@ struct tdls_set_state_info {
  * @tdls_evt_cb_data: tdls event user data
  * @tdls_peer_context: userdata for register/deregister TDLS peer
  * @tdls_reg_peer: register tdls peer with datapath
+ * @tdls_dereg_peer: deregister tdls peer from datapath
  * @tx_q_ack: queue for tx frames waiting for ack
  * @tdls_con_cap: tdls concurrency support
  * @tdls_send_mgmt_req: store eWNI_SME_TDLS_SEND_MGMT_REQ value
@@ -183,11 +183,6 @@ struct tdls_set_state_info {
  * @tdls_update_dp_vdev_flags store CDP_UPDATE_TDLS_FLAGS
  * @tdls_idle_peer_data: provide information about idle peer
  * @tdls_ct_spinlock: connection tracker spin lock
- * @is_prevent_suspend: prevent suspend or not
- * @is_drv_supported: platform supports drv or not, enable/disable tdls wow
- * based on this flag.
- * @wake_lock: wake lock
- * @runtime_lock: runtime lock
  * @tdls_osif_init_cb: Callback to initialize the tdls private
  * @tdls_osif_deinit_cb: Callback to deinitialize the tdls private
  */
@@ -220,6 +215,7 @@ struct tdls_soc_priv_obj {
 	void *tdls_evt_cb_data;
 	void *tdls_peer_context;
 	tdls_register_peer_callback tdls_reg_peer;
+	tdls_deregister_peer_callback tdls_dereg_peer;
 	tdls_dp_vdev_update_flags_callback tdls_dp_vdev_update;
 	qdf_list_t tx_q_ack;
 	enum tdls_conc_cap tdls_con_cap;
@@ -230,12 +226,6 @@ struct tdls_soc_priv_obj {
 	uint16_t tdls_del_all_peers;
 	uint32_t tdls_update_dp_vdev_flags;
 	qdf_spinlock_t tdls_ct_spinlock;
-#ifdef TDLS_WOW_ENABLED
-	bool is_prevent_suspend;
-	bool is_drv_supported;
-	qdf_wake_lock_t wake_lock;
-	qdf_runtime_lock_t runtime_lock;
-#endif
 	tdls_vdev_init_cb tdls_osif_init_cb;
 	tdls_vdev_deinit_cb tdls_osif_deinit_cb;
 };
@@ -283,8 +273,7 @@ struct tdls_peer_mlme_info {
  * @node: node
  * @vdev_priv: tdls vdev priv obj
  * @peer_mac: peer mac address
- * @valid_entry: entry valid or not (set to true when peer create resp is
- *               received from FW)
+ * @sta_id: station identifier
  * @rssi: rssi
  * @tdls_support: tdls support
  * @link_status: tdls link status
@@ -315,7 +304,7 @@ struct tdls_peer {
 	qdf_list_node_t node;
 	struct tdls_vdev_priv_obj *vdev_priv;
 	struct qdf_mac_addr peer_mac;
-	bool valid_entry;
+	uint16_t sta_id;
 	int8_t rssi;
 	enum tdls_peer_capab tdls_support;
 	enum tdls_link_state link_status;

@@ -145,9 +145,9 @@
  * by threshold the BSSID which is in the blacklist manager list should be
  * removed from the respective list.
  *
- * Supported Feature: Customer requirement
+ * Supported Feature: 6GHz STA
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */

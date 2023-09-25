@@ -27,9 +27,7 @@
 
    ========================================================================*/
 
-#define MAX_MEASUREMENT_REQUEST      5
-#define MAX_NUM_CHANNELS             255
-
+#define MAX_MEASUREMENT_REQUEST 2
 #define DEFAULT_RRM_IDX 0
 
 typedef enum eRrmRetStatus {
@@ -45,11 +43,10 @@ typedef enum eRrmMsgReqSource {
 	eRRM_MSG_SOURCE_ESE_UPLOAD = 3, /* ese upload approach */
 } tRrmMsgReqSource;
 
-struct sir_channel_info {
-	uint8_t reg_class;
-	uint8_t chan_num;
-	uint32_t chan_freq;
-};
+typedef struct sSirChannelInfo {
+	uint8_t regulatoryClass;
+	uint8_t channelNum;
+} tSirChannelInfo, *tpSirChannelInfo;
 
 typedef struct sSirBeaconReportReqInd {
 	uint16_t messageType;   /* eWNI_SME_BEACON_REPORT_REQ_IND */
@@ -58,14 +55,14 @@ typedef struct sSirBeaconReportReqInd {
 	tSirMacAddr bssId;
 	uint16_t measurementDuration[SIR_ESE_MAX_MEAS_IE_REQS]; /* ms */
 	uint16_t randomizationInterval; /* ms */
-	struct sir_channel_info channel_info;
+	tSirChannelInfo channelInfo;
 	/* 0: wildcard */
 	tSirMacAddr macaddrBssid;
 	/* 0:Passive, 1: Active, 2: table mode */
 	uint8_t fMeasurementtype[SIR_ESE_MAX_MEAS_IE_REQS];
 	tAniSSID ssId;          /* May be wilcard. */
 	uint16_t uDialogToken;
-	struct report_channel_list channel_list; /* From AP channel report. */
+	struct report_channel_list channelList;    /* From AP channel report. */
 	tRrmMsgReqSource msgSource;
 } tSirBeaconReportReqInd, *tpSirBeaconReportReqInd;
 
@@ -220,10 +217,7 @@ typedef struct sRrmPEContext {
 	/* Dialog token for the request initiated from station. */
 	uint8_t DialogToken;
 	uint16_t prev_rrm_report_seq_num;
-	uint8_t num_active_request;
 	tpRRMReq pCurrentReq[MAX_MEASUREMENT_REQUEST];
-	uint32_t beacon_rpt_chan_list[MAX_NUM_CHANNELS];
-	uint8_t beacon_rpt_chan_num;
 } tRrmPEContext, *tpRrmPEContext;
 
 /* 2008 11k spec reference: 18.4.8.5 RCPI Measurement */

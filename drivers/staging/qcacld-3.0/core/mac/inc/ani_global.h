@@ -306,7 +306,7 @@ typedef struct {
 typedef struct sAniSirLim {
 	/* ////////////////////////////////////     TIMER RELATED START /////////////////////////////////////////// */
 
-	tLimTimers lim_timers;
+	tLimTimers limTimers;
 	/* / Flag to track if LIM timers are created or not */
 	uint32_t gLimTimersCreated;
 
@@ -685,22 +685,19 @@ typedef struct sRrmContext {
 } tRrmContext, *tpRrmContext;
 
 /**
- * enum tx_ack_status - Indicate TX status
- * @LIM_ACK_NOT_RCD: Default status while waiting for ack status.
- * @LIM_ACK_RCD_SUCCESS: Ack is received.
- * @LIM_ACK_RCD_FAILURE: No Ack received.
- * @LIM_TX_FAILED: Failed to TX
+ * enum auth_tx_ack_status - Indicate TX status of AUTH
+ * @LIM_AUTH_ACK_NOT_RCD : Default status while waiting for ack status.
+ * @LIM_AUTH_ACK_RCD_SUCCESS : Ack is received.
+ * @LIM_AUTH_ACK_RCD_FAILURE : No Ack received.
  *
  * Indicate if driver is waiting for ACK status of auth or ACK received for AUTH
  * OR NO ACK is received for the auth sent.
  */
-enum tx_ack_status {
-	LIM_ACK_NOT_RCD,
-	LIM_ACK_RCD_SUCCESS,
-	LIM_ACK_RCD_FAILURE,
-	LIM_TX_FAILED,
+enum auth_tx_ack_status {
+	LIM_AUTH_ACK_NOT_RCD,
+	LIM_AUTH_ACK_RCD_SUCCESS,
+	LIM_AUTH_ACK_RCD_FAILURE,
 };
-
 /**
  * struct vdev_type_nss - vdev type nss structure
  * @sta: STA Nss value.
@@ -749,14 +746,6 @@ struct mgmt_beacon_probe_filter {
 	uint8_t sap_channel[WLAN_MAX_VDEVS];
 };
 
-#ifdef FEATURE_ANI_LEVEL_REQUEST
-struct ani_level_params {
-	void (*ani_level_cb)(struct wmi_host_ani_level_event *ani, uint8_t num,
-			     void *context);
-	void *context;
-};
-#endif
-
 /**
  * struct mac_context - Global MAC context
  */
@@ -797,21 +786,17 @@ struct mac_context {
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
 	void (*chan_info_cb)(struct scan_chan_info *chan_info);
-	void (*del_peers_ind_cb)(struct wlan_objmgr_psoc *psoc,
-				 uint8_t vdev_id);
 	/* Based on INI parameter */
 	uint32_t dual_mac_feature_disable;
 
 	enum  country_src reg_hint_src;
 	uint32_t rx_packet_drop_counter;
-	enum tx_ack_status auth_ack_status;
-	enum tx_ack_status assoc_ack_status;
+	enum auth_tx_ack_status auth_ack_status;
 	uint8_t user_configured_nss;
 	bool ignore_assoc_disallowed;
 	uint32_t peer_rssi;
 	uint32_t peer_txrate;
 	uint32_t peer_rxrate;
-	uint32_t rx_retry_cnt;
 	uint32_t rx_mc_bc_cnt;
 	/* 11k Offload Support */
 	bool is_11k_offload_supported;
@@ -839,11 +824,6 @@ struct mac_context {
 #endif
 	bool obss_scan_offload;
 	bool bcn_reception_stats;
-	csr_session_close_cb session_close_cb;
-	csr_roam_complete_cb session_roam_complete_cb;
-#ifdef FEATURE_ANI_LEVEL_REQUEST
-	struct ani_level_params ani_params;
-#endif
 };
 
 #ifdef FEATURE_WLAN_TDLS

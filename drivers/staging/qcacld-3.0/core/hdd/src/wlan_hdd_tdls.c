@@ -848,7 +848,8 @@ int wlan_hdd_tdls_antenna_switch(struct hdd_context *hdd_ctx,
 }
 
 QDF_STATUS hdd_tdls_register_peer(void *userdata, uint32_t vdev_id,
-				  const uint8_t *mac, uint8_t qos)
+				  const uint8_t *mac, uint16_t sta_id,
+				  uint8_t qos)
 {
 	struct hdd_adapter *adapter;
 	struct hdd_context *hddctx;
@@ -864,7 +865,27 @@ QDF_STATUS hdd_tdls_register_peer(void *userdata, uint32_t vdev_id,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	return hdd_roam_register_tdlssta(adapter, mac, qos);
+	return hdd_roam_register_tdlssta(adapter, mac, sta_id, qos);
+}
+
+QDF_STATUS hdd_tdls_deregister_peer(void *userdata, uint32_t vdev_id,
+				    uint8_t sta_id)
+{
+	struct hdd_adapter *adapter;
+	struct hdd_context *hddctx;
+
+	hddctx = userdata;
+	if (!hddctx) {
+		hdd_err("Invalid hddctx");
+		return QDF_STATUS_E_INVAL;
+	}
+	adapter = hdd_get_adapter_by_vdev(hddctx, vdev_id);
+	if (!adapter) {
+		hdd_err("Invalid adapter");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return hdd_roam_deregister_tdlssta(adapter, sta_id);
 }
 
 void hdd_init_tdls_config(struct tdls_start_params *tdls_cfg)
@@ -879,7 +900,7 @@ void hdd_config_tdls_with_band_switch(struct hdd_context *hdd_ctx)
 {
 	struct wlan_objmgr_vdev *tdls_obj_vdev;
 	int offchmode;
-	uint32_t current_band;
+	enum band_info current_band;
 	bool tdls_off_ch;
 
 	if (!hdd_ctx) {
@@ -887,7 +908,7 @@ void hdd_config_tdls_with_band_switch(struct hdd_context *hdd_ctx)
 		return;
 	}
 
-	if (ucfg_reg_get_band(hdd_ctx->pdev, &current_band) !=
+	if (ucfg_reg_get_curr_band(hdd_ctx->pdev, &current_band) !=
 	    QDF_STATUS_SUCCESS) {
 		hdd_err("Failed to get current band config");
 		return;
@@ -902,8 +923,7 @@ void hdd_config_tdls_with_band_switch(struct hdd_context *hdd_ctx)
 	 * If 2g or 5g is not supported. Disable tdls off channel only when
 	 * tdls off channel is enabled currently.
 	 */
-	if ((current_band & BIT(REG_BAND_2G)) &&
-	    (current_band & BIT(REG_BAND_5G))) {
+	if (current_band == BAND_ALL) {
 		if (cfg_tdls_get_off_channel_enable_orig(
 			hdd_ctx->psoc, &tdls_off_ch) !=
 		    QDF_STATUS_SUCCESS) {

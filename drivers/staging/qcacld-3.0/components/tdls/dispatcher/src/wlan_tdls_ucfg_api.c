@@ -142,12 +142,8 @@ tdls_update_feature_flag(struct tdls_soc_priv_obj *tdls_soc_obj)
 		  1 << TDLS_FEATURE_ENABLE : 0) |
 		 (tdls_soc_obj->tdls_configs.tdls_implicit_trigger_enable ?
 		  1 << TDLS_FEAUTRE_IMPLICIT_TRIGGER : 0) |
-		 (tdls_soc_obj->tdls_configs.tdls_external_control &
-		  TDLS_STRICT_EXTERNAL_CONTROL ?
-		  1 << TDLS_FEATURE_EXTERNAL_CONTROL : 0) |
-		 (tdls_soc_obj->tdls_configs.tdls_external_control &
-		  TDLS_LIBERAL_EXTERNAL_CONTROL ?
-		  1 << TDLS_FEATURE_LIBERAL_EXTERNAL_CONTROL : 0));
+		 (tdls_soc_obj->tdls_configs.tdls_external_control ?
+		  1 << TDLS_FEATURE_EXTERNAL_CONTROL : 0));
 }
 
 /**
@@ -222,58 +218,15 @@ static QDF_STATUS tdls_object_init_params(
 			cfg_get(psoc, CFG_TDLS_IMPLICIT_TRIGGER);
 	tdls_soc_obj->tdls_configs.tdls_external_control =
 			cfg_get(psoc, CFG_TDLS_EXTERNAL_CONTROL);
-	tdls_soc_obj->max_num_tdls_sta =
-			cfg_get(psoc, CFG_TDLS_MAX_PEER_COUNT);
 
 	tdls_update_feature_flag(tdls_soc_obj);
 
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef TDLS_WOW_ENABLED
-/**
- * tdls_wow_init(): Create/init wake lock for TDLS
- *
- * Create/init wake lock for TDLS if DVR isn't supported
- *
- * Return None
- */
-static void tdls_wow_init(struct tdls_soc_priv_obj *soc_obj)
-{
-	soc_obj->is_prevent_suspend = false;
-	soc_obj->is_drv_supported = qdf_is_drv_supported();
-	if (!soc_obj->is_drv_supported) {
-		qdf_wake_lock_create(&soc_obj->wake_lock, "wlan_tdls");
-		qdf_runtime_lock_init(&soc_obj->runtime_lock);
-	}
-}
-
-/**
- * tdls_wow_deinit(): Destroy/deinit wake lock for TDLS
- *
- * Destroy/deinit wake lock for TDLS if DVR isn't supported
- *
- * Return None
- */
-static void tdls_wow_deinit(struct tdls_soc_priv_obj *soc_obj)
-{
-	if (!soc_obj->is_drv_supported) {
-		qdf_runtime_lock_deinit(&soc_obj->runtime_lock);
-		qdf_wake_lock_destroy(&soc_obj->wake_lock);
-	}
-}
-#else
-static void tdls_wow_init(struct tdls_soc_priv_obj *soc_obj)
-{
-}
-
-static void tdls_wow_deinit(struct tdls_soc_priv_obj *soc_obj)
-{
-}
-#endif
-
 static QDF_STATUS tdls_global_init(struct tdls_soc_priv_obj *soc_obj)
 {
+
 	tdls_object_init_params(soc_obj);
 	soc_obj->connected_peer_count = 0;
 	soc_obj->tdls_nss_switch_in_progress = false;
@@ -285,16 +238,13 @@ static QDF_STATUS tdls_global_init(struct tdls_soc_priv_obj *soc_obj)
 	soc_obj->tdls_disable_in_progress = false;
 
 	qdf_spinlock_create(&soc_obj->tdls_ct_spinlock);
-	tdls_wow_init(soc_obj);
 
 	return QDF_STATUS_SUCCESS;
 }
 
 static QDF_STATUS tdls_global_deinit(struct tdls_soc_priv_obj *soc_obj)
 {
-	tdls_wow_deinit(soc_obj);
 	qdf_spinlock_destroy(&soc_obj->tdls_ct_spinlock);
-
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -348,6 +298,7 @@ QDF_STATUS ucfg_tdls_update_config(struct wlan_objmgr_psoc *psoc,
 
 	/* Save callbacks to register/deregister TDLS sta with datapath */
 	soc_obj->tdls_reg_peer = req->tdls_reg_peer;
+	soc_obj->tdls_dereg_peer = req->tdls_dereg_peer;
 	soc_obj->tdls_peer_context = req->tdls_peer_context;
 
 	/* Save legacy PE/WMA commands in TDLS soc object */
@@ -387,9 +338,11 @@ QDF_STATUS ucfg_tdls_update_config(struct wlan_objmgr_psoc *psoc,
 	    TDLS_IS_OFF_CHANNEL_ENABLED(tdls_feature_flags))
 		soc_obj->max_num_tdls_sta =
 			WLAN_TDLS_STA_P_UAPSD_OFFCHAN_MAX_NUM;
+		else
+			soc_obj->max_num_tdls_sta = WLAN_TDLS_STA_MAX_NUM;
 
 	for (sta_idx = 0; sta_idx < soc_obj->max_num_tdls_sta; sta_idx++) {
-		soc_obj->tdls_conn_info[sta_idx].valid_entry = false;
+		soc_obj->tdls_conn_info[sta_idx].sta_id = INVALID_TDLS_PEER_ID;
 		soc_obj->tdls_conn_info[sta_idx].index =
 						INVALID_TDLS_PEER_INDEX;
 		soc_obj->tdls_conn_info[sta_idx].session_id = 255;
@@ -603,9 +556,9 @@ QDF_STATUS ucfg_tdls_oper(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	tdls_debug("%s for peer " QDF_MAC_ADDR_FMT,
+	tdls_debug("%s for peer " QDF_MAC_ADDR_STR,
 		   tdls_get_oper_str(cmd),
-		   QDF_MAC_ADDR_REF(macaddr));
+		   QDF_MAC_ADDR_ARRAY(macaddr));
 
 	req = qdf_mem_malloc(sizeof(*req));
 	if (!req) {

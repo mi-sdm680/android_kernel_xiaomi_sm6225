@@ -72,7 +72,6 @@ fwol_psoc_object_created_notification(struct wlan_objmgr_psoc *psoc, void *arg)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		fwol_err("Failed to attach psoc_ctx with psoc");
 		qdf_mem_free(fwol_obj);
-		return status;
 	}
 
 	tgt_fwol_register_rx_ops(&fwol_obj->rx_ops);
@@ -317,21 +316,6 @@ QDF_STATUS ucfg_get_enable_rts_sifsbursting(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS ucfg_get_enable_sifs_burst(struct wlan_objmgr_psoc *psoc,
-				      uint8_t *enable_sifs_burst)
-{
-	struct wlan_fwol_psoc_obj *fwol_obj;
-
-	fwol_obj = fwol_get_psoc_obj(psoc);
-	if (!fwol_obj) {
-		fwol_err("Failed to get FWOL obj");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	*enable_sifs_burst = fwol_obj->cfg.enable_sifs_burst;
-	return QDF_STATUS_SUCCESS;
-}
-
 QDF_STATUS ucfg_get_max_mpdus_inampdu(struct wlan_objmgr_psoc *psoc,
 				      uint8_t *max_mpdus_inampdu)
 {
@@ -520,26 +504,6 @@ QDF_STATUS ucfg_fwol_get_enable_fw_module_log_level(
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS ucfg_fwol_wow_get_enable_fw_module_log_level(
-				struct wlan_objmgr_psoc *psoc,
-				uint8_t **enable_fw_wow_module_log_level,
-				uint8_t *enable_fw_wow_module_log_level_num)
-{
-	struct wlan_fwol_psoc_obj *fwol_obj;
-
-	fwol_obj = fwol_get_psoc_obj(psoc);
-	if (!fwol_obj) {
-		fwol_err("Failed to get FWOL obj");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	*enable_fw_wow_module_log_level =
-				fwol_obj->cfg.enable_fw_mod_wow_log_level;
-	*enable_fw_wow_module_log_level_num =
-				fwol_obj->cfg.enable_fw_mod_wow_log_level_num;
-	return QDF_STATUS_SUCCESS;
-}
-
 QDF_STATUS ucfg_fwol_get_sap_xlna_bypass(struct wlan_objmgr_psoc *psoc,
 					 bool *sap_xlna_bypass)
 {
@@ -637,27 +601,6 @@ ucfg_fwol_get_tsf_irq_host_gpio_pin(struct wlan_objmgr_psoc *psoc,
 	}
 
 	*tsf_irq_host_gpio_pin = fwol_obj->cfg.tsf_irq_host_gpio_pin;
-	return QDF_STATUS_SUCCESS;
-}
-
-#endif
-
-#ifdef WLAN_FEATURE_TSF_PLUS_EXT_GPIO_SYNC
-QDF_STATUS
-ucfg_fwol_get_tsf_sync_host_gpio_pin(struct wlan_objmgr_psoc *psoc,
-				     uint32_t *tsf_sync_host_gpio_pin)
-{
-	struct wlan_fwol_psoc_obj *fwol_obj;
-
-	fwol_obj = fwol_get_psoc_obj(psoc);
-	if (!fwol_obj) {
-		fwol_err("Failed to get FWOL obj");
-		*tsf_sync_host_gpio_pin =
-			cfg_default(CFG_SET_TSF_SYNC_HOST_GPIO_PIN);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	*tsf_sync_host_gpio_pin = fwol_obj->cfg.tsf_sync_host_gpio_pin;
 	return QDF_STATUS_SUCCESS;
 }
 

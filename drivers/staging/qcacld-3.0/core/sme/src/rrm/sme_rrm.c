@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -36,7 +36,6 @@
 #include "rrm_global.h"
 #include <wlan_scan_ucfg_api.h>
 #include <wlan_scan_utils_api.h>
-#include <wlan_reg_services_api.h>
 #include <wlan_utility.h>
 
 /* Roam score for a neighbor AP will be calculated based on the below
@@ -213,12 +212,12 @@ sme_rrm_send_beacon_report_xmit_ind(struct mac_context *mac_ctx,
 				bss_desc, size);
 			tmp_bss_desc[i] =
 				beacon_rep->pBssDescription[i];
-			sme_debug("RRM Result Bssid = " QDF_MAC_ADDR_FMT
-				  " freq= %d, rssi = -%d",
-				  QDF_MAC_ADDR_REF(
-				  beacon_rep->pBssDescription[i]->bssId),
-				  beacon_rep->pBssDescription[i]->chan_freq,
-				  beacon_rep->pBssDescription[i]->rssi * (-1));
+			sme_debug("RRM Result Bssid = " QDF_MAC_ADDR_STR
+				" chan= %d, rssi = -%d",
+				QDF_MAC_ADDR_ARRAY(
+				beacon_rep->pBssDescription[i]->bssId),
+				beacon_rep->pBssDescription[i]->channelId,
+				beacon_rep->pBssDescription[i]->rssi * (-1));
 			beacon_rep->numBssDesc++;
 			if (++i >= SIR_BCN_REPORT_MAX_BSS_DESC)
 				break;
@@ -253,13 +252,12 @@ sme_rrm_send_beacon_report_xmit_ind(struct mac_context *mac_ctx,
 #ifdef FEATURE_WLAN_ESE
 /**
  * sme_ese_send_beacon_req_scan_results () - Send beacon report
- * @mac_ctx: Pointer to mac context
+ * @mac_ctx  Pointer to mac context
  * @measurement_index: Measurement request index
- * @session_id: session id
- * @freq: channel frequency
- * @result_arr: scan results
- * @msrmnt_status: flag to indicate that the measurement is done.
- * @bss_count:  number of bss found
+ * @session_id - session id
+ * @result_arr scan results
+ * @msrmnt_status flag to indicate that the measurement is done.
+ * @bss_count  number of bss found
  *
  * This function sends up the scan results received as a part of
  * beacon request scanning.
@@ -271,7 +269,7 @@ sme_rrm_send_beacon_report_xmit_ind(struct mac_context *mac_ctx,
  */
 static QDF_STATUS sme_ese_send_beacon_req_scan_results(
 	struct mac_context *mac_ctx, uint8_t measurement_index,
-	uint32_t session_id, uint32_t freq,
+	uint32_t session_id, uint8_t channel,
 	tCsrScanResultInfo **result_arr,
 	uint8_t msrmnt_status, uint8_t bss_count)
 {
@@ -314,7 +312,8 @@ static QDF_STATUS sme_ese_send_beacon_req_scan_results(
 		qdf_mem_zero(&bcn_rpt_rsp, sizeof(bcn_rpt_rsp));
 
 		for (i = 0; i < rrm_ctx->eseBcnReqInfo.numBcnReqIe; i++) {
-			if (rrm_ctx->eseBcnReqInfo.bcnReq[i].ch_freq == freq) {
+			if (rrm_ctx->eseBcnReqInfo.bcnReq[i].channel ==
+				channel) {
 				cur_meas_req =
 					&rrm_ctx->eseBcnReqInfo.bcnReq[i];
 				break;
@@ -323,8 +322,8 @@ static QDF_STATUS sme_ese_send_beacon_req_scan_results(
 		if (cur_meas_req)
 			bcn_report->measurementToken =
 				cur_meas_req->measurementToken;
-		sme_debug("freq: %d MeasToken: %d", freq,
-			  bcn_report->measurementToken);
+		sme_debug("Channel: %d MeasToken: %d", channel,
+			bcn_report->measurementToken);
 
 		j = 0;
 		while (cur_result) {
@@ -336,9 +335,8 @@ static QDF_STATUS sme_ese_send_beacon_req_scan_results(
 			ie_len = GET_IE_LEN_IN_BSS(bss_desc->length);
 			bcn_rpt_fields =
 				&bcn_report->bcnRepBssInfo[j].bcnReportFields;
-			bcn_rpt_fields->ChanNum = wlan_reg_freq_to_chan(
-					mac_ctx->pdev,
-					bss_desc->chan_freq);
+			bcn_rpt_fields->ChanNum =
+				bss_desc->channelId;
 			bcn_report->bcnRepBssInfo[j].bcnReportFields.Spare = 0;
 			if (cur_meas_req)
 				bcn_rpt_fields->MeasDuration =
@@ -365,9 +363,9 @@ static QDF_STATUS sme_ese_send_beacon_req_scan_results(
 				continue;
 			bcn_report->bcnRepBssInfo[j].ieLen = out_ie_len;
 
-			sme_debug("Bssid"QDF_MAC_ADDR_FMT" Freq:%d Rssi:%d",
-				  QDF_MAC_ADDR_REF(bss_desc->bssId),
-				  bss_desc->chan_freq, (-1) * bss_desc->rssi);
+			sme_debug("Bssid"QDF_MAC_ADDR_STR" Channel: %d Rssi: %d",
+				QDF_MAC_ADDR_ARRAY(bss_desc->bssId),
+				bss_desc->channelId, (-1) * bss_desc->rssi);
 			bcn_report->numBss++;
 			if (++j >= SIR_BCN_REPORT_MAX_BSS_DESC)
 				break;
@@ -425,7 +423,7 @@ void sme_reset_ese_bcn_req_in_progress(tpRrmSMEContext sme_rrm_ctx)
  * @mac_ctx: pointer to mac context
  * @measurement_index: Measurement request number
  * @num_chan: number of channels
- * @freq_list: list of channel frequencies to fetch the result from
+ * @chan_list: list of channels to fetch the result from
  * @measurementdone: Flag to indicate measurement done or no
  *
  * This function is called to get the scan result from CSR and send the beacon
@@ -436,11 +434,11 @@ void sme_reset_ese_bcn_req_in_progress(tpRrmSMEContext sme_rrm_ctx)
 static QDF_STATUS sme_rrm_send_scan_result(struct mac_context *mac_ctx,
 					   uint8_t measurement_index,
 					   uint8_t num_chan,
-					   uint32_t *freq_list,
+					   uint8_t *chan_list,
 					   uint8_t measurementdone)
 {
 	mac_handle_t mac_handle = MAC_HANDLE(mac_ctx);
-	struct scan_filter *filter;
+	tCsrScanResultFilter filter;
 	tScanResultHandle result_handle;
 	tCsrScanResultInfo *scan_results, *next_result;
 	tCsrScanResultInfo **scanresults_arr = NULL;
@@ -454,36 +452,27 @@ static QDF_STATUS sme_rrm_send_scan_result(struct mac_context *mac_ctx,
 	tSirScanType scan_type;
 	struct csr_roam_session *session;
 
-	filter = qdf_mem_malloc(sizeof(*filter));
-	if (!filter)
-		return QDF_STATUS_E_NOMEM;
-
-	if (qdf_is_macaddr_zero(filter->bssid_list) ||
-	    qdf_is_macaddr_group(filter->bssid_list)) {
-		filter->num_of_bssid = 0;
-	} else {
-		/* update filter to get scan result with just target BSSID */
-		filter->num_of_bssid = 1;
-		qdf_mem_copy(filter->bssid_list[0].bytes,
-			     rrm_ctx->bssId, sizeof(struct qdf_mac_addr));
-	}
+	qdf_mem_zero(&filter, sizeof(filter));
+	filter.BSSIDs.numOfBSSIDs = 1;
+	filter.BSSIDs.bssid = (struct qdf_mac_addr *)&rrm_ctx->bssId;
 
 	if (rrm_ctx->ssId.length) {
-		filter->num_of_ssid = 1;
-		filter->ssid_list[0].length = rrm_ctx->ssId.length;
-		if (filter->ssid_list[0].length > WLAN_SSID_MAX_LEN)
-			filter->ssid_list[0].length = WLAN_SSID_MAX_LEN;
-		qdf_mem_copy(filter->ssid_list[0].ssid,
-			     rrm_ctx->ssId.ssId, filter->ssid_list[0].length);
+		filter.SSIDs.SSIDList = qdf_mem_malloc(sizeof(tCsrSSIDInfo));
+		if (!filter.SSIDs.SSIDList)
+			return QDF_STATUS_E_NOMEM;
+
+		filter.SSIDs.SSIDList->SSID.length =
+			rrm_ctx->ssId.length;
+		qdf_mem_copy(filter.SSIDs.SSIDList->SSID.ssId,
+				rrm_ctx->ssId.ssId, rrm_ctx->ssId.length);
+		filter.SSIDs.numOfSSIDs = 1;
+	} else {
+		filter.SSIDs.numOfSSIDs = 0;
 	}
 
-	filter->num_of_channels = num_chan;
-	if (filter->num_of_channels > NUM_CHANNELS)
-		filter->num_of_channels = NUM_CHANNELS;
-	qdf_mem_copy(filter->chan_freq_list, freq_list,
-		     filter->num_of_channels *
-		     sizeof(filter->chan_freq_list[0]));
-	filter->rrm_measurement_filter = true;
+	filter.ChannelInfo.numOfChannels = num_chan;
+	filter.ChannelInfo.ChannelList = chan_list;
+	filter.fMeasurement = true;
 
 	if (eRRM_MSG_SOURCE_ESE_UPLOAD == rrm_ctx->msgSource ||
 	    eRRM_MSG_SOURCE_LEGACY_ESE == rrm_ctx->msgSource)
@@ -492,9 +481,8 @@ static QDF_STATUS sme_rrm_send_scan_result(struct mac_context *mac_ctx,
 		scan_type = rrm_ctx->measMode[0];
 
 	if (scan_type == eSIR_BEACON_TABLE)
-		filter->age_threshold =
+		filter.age_threshold =
 			wlan_scan_get_aging_time(mac_ctx->psoc);
-
 
 	/*
 	 * In case this is beacon report request from last AP (before roaming)
@@ -507,8 +495,10 @@ static QDF_STATUS sme_rrm_send_scan_result(struct mac_context *mac_ctx,
 		session_id = mac_ctx->roam.roamSession->sessionId;
 	}
 	status = sme_scan_get_result(mac_handle, (uint8_t)session_id,
-				     filter, &result_handle);
-	qdf_mem_free(filter);
+				     &filter, &result_handle);
+
+	if (filter.SSIDs.SSIDList)
+		qdf_mem_free(filter.SSIDs.SSIDList);
 
 	sme_debug("RRM Measurement Done %d for index:%d",
 		  measurementdone, measurement_index);
@@ -532,7 +522,7 @@ static QDF_STATUS sme_rrm_send_scan_result(struct mac_context *mac_ctx,
 		if (eRRM_MSG_SOURCE_ESE_UPLOAD == rrm_ctx->msgSource)
 			status = sme_ese_send_beacon_req_scan_results(mac_ctx,
 					measurement_index, session_id,
-					freq_list[0], NULL,
+					chan_list[0], NULL,
 					measurementdone, 0);
 		else
 #endif /* FEATURE_WLAN_ESE */
@@ -547,7 +537,7 @@ static QDF_STATUS sme_rrm_send_scan_result(struct mac_context *mac_ctx,
 		if (eRRM_MSG_SOURCE_ESE_UPLOAD == rrm_ctx->msgSource) {
 			status = sme_ese_send_beacon_req_scan_results(mac_ctx,
 					measurement_index, session_id,
-					freq_list[0], NULL,
+					chan_list[0], NULL,
 					measurementdone, 0);
 		} else
 #endif /* FEATURE_WLAN_ESE */
@@ -638,7 +628,7 @@ static QDF_STATUS sme_rrm_send_scan_result(struct mac_context *mac_ctx,
 		if (eRRM_MSG_SOURCE_ESE_UPLOAD == rrm_ctx->msgSource)
 			status = sme_ese_send_beacon_req_scan_results(mac_ctx,
 					measurement_index, session_id,
-					freq_list[0], scanresults_arr,
+					chan_list[0], scanresults_arr,
 					measurementdone, counter);
 		else
 #endif /* FEATURE_WLAN_ESE */
@@ -682,8 +672,6 @@ static QDF_STATUS sme_rrm_scan_request_callback(struct mac_context *mac,
 	QDF_STATUS qdf_status;
 	uint32_t session_id;
 	bool valid_result = true;
-	uint8_t ch_idx, num_chan;
-	uint32_t *freq_list;
 
 	/*
 	 * RRM scan response received after roaming to different AP.
@@ -697,20 +685,19 @@ static QDF_STATUS sme_rrm_scan_request_callback(struct mac_context *mac,
 		valid_result = false;
 	}
 
-	/* if any more channels are pending, start a timer of a random value
-	 * within randomization interval.
-	 */
-	freq_list = pSmeRrmContext->channelList.freq_list;
-	if (!freq_list) {
+
+	if (!pSmeRrmContext->channelList.ChannelList) {
 		sme_err("[802.11 RRM]: Global freq list is null");
 		pSmeRrmContext->channelList.numOfChannels = 0;
 		sme_reset_ese_bcn_req_in_progress(pSmeRrmContext);
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	ch_idx = pSmeRrmContext->currentIndex;
-	num_chan = pSmeRrmContext->channelList.numOfChannels;
-	if (((ch_idx + 1) < num_chan) && valid_result) {
+	/* if any more channels are pending, start a timer of a random value
+	 * within randomization interval.
+	 */
+	if (((pSmeRrmContext->currentIndex + 1) <
+	     pSmeRrmContext->channelList.numOfChannels) && valid_result) {
 		if (QDF_TIMER_STATE_RUNNING ==
 		    qdf_mc_timer_get_current_state(
 				      &pSmeRrmContext->IterMeasTimer)) {
@@ -725,17 +712,21 @@ static QDF_STATUS sme_rrm_scan_request_callback(struct mac_context *mac,
 			sme_err("[802.11 RRM]: meas timer is already running");
 			sme_rrm_send_scan_result(mac,
 					pSmeRrmContext->measurement_idx,
-					1, &freq_list[ch_idx], true);
-			qdf_mem_free(pSmeRrmContext->channelList.freq_list);
-			pSmeRrmContext->channelList.freq_list = NULL;
+					1, &pSmeRrmContext->channelList.
+					ChannelList[pSmeRrmContext
+					->currentIndex], true);
+			qdf_mem_free(pSmeRrmContext->channelList.ChannelList);
+			pSmeRrmContext->channelList.ChannelList = NULL;
 			pSmeRrmContext->channelList.numOfChannels = 0;
 			sme_reset_ese_bcn_req_in_progress(pSmeRrmContext);
 			return QDF_STATUS_E_FAILURE;
 		}
 
 		sme_rrm_send_scan_result(mac, pSmeRrmContext->measurement_idx,
-					 1, &freq_list[ch_idx], false);
-
+					 1, &pSmeRrmContext->channelList.
+					 ChannelList[pSmeRrmContext
+					->currentIndex],
+					 false);
 		/* Advance the current index. */
 		pSmeRrmContext->currentIndex++;
 		/* start the timer to issue next request. */
@@ -750,8 +741,8 @@ static QDF_STATUS sme_rrm_scan_request_callback(struct mac_context *mac,
 		qdf_status = qdf_mc_timer_start(&pSmeRrmContext->IterMeasTimer,
 						interval);
 		if (QDF_IS_STATUS_ERROR(qdf_status)) {
-			qdf_mem_free(pSmeRrmContext->channelList.freq_list);
-			pSmeRrmContext->channelList.freq_list = NULL;
+			qdf_mem_free(pSmeRrmContext->channelList.ChannelList);
+			pSmeRrmContext->channelList.ChannelList = NULL;
 			pSmeRrmContext->channelList.numOfChannels = 0;
 			sme_reset_ese_bcn_req_in_progress(pSmeRrmContext);
 		}
@@ -761,9 +752,12 @@ static QDF_STATUS sme_rrm_scan_request_callback(struct mac_context *mac,
 		 * message to PE with measurement done flag set.
 		 */
 		sme_rrm_send_scan_result(mac, pSmeRrmContext->measurement_idx,
-					 1, &freq_list[ch_idx], true);
-		qdf_mem_free(pSmeRrmContext->channelList.freq_list);
-		pSmeRrmContext->channelList.freq_list = NULL;
+					 1, &pSmeRrmContext->channelList.
+					 ChannelList[pSmeRrmContext
+					->currentIndex],
+					 true);
+		qdf_mem_free(pSmeRrmContext->channelList.ChannelList);
+		pSmeRrmContext->channelList.ChannelList = NULL;
 		pSmeRrmContext->channelList.numOfChannels = 0;
 		sme_reset_ese_bcn_req_in_progress(pSmeRrmContext);
 	}
@@ -829,14 +823,14 @@ sme_rrm_issue_scan_req(struct mac_context *mac_ctx, uint8_t idx)
 	tpRrmSMEContext sme_rrm_ctx = &mac_ctx->rrm.rrmSmeContext[idx];
 	uint32_t session_id;
 	tSirScanType scan_type;
+	uint8_t *chan_list;
 	uint8_t ch_idx;
-	uint32_t *freq_list;
 
 	status = csr_roam_get_session_id_from_bssid(mac_ctx,
 			&sme_rrm_ctx->sessionBssId, &session_id);
 	if (status != QDF_STATUS_SUCCESS) {
-		sme_err("sme session ID not found for bssid= "QDF_MAC_ADDR_FMT,
-			QDF_MAC_ADDR_REF(sme_rrm_ctx->sessionBssId.bytes));
+		sme_err("sme session ID not found for bssid= "QDF_MAC_ADDR_STR,
+			QDF_MAC_ADDR_ARRAY(sme_rrm_ctx->sessionBssId.bytes));
 		status = QDF_STATUS_E_FAILURE;
 		goto send_ind;
 	}
@@ -861,14 +855,7 @@ sme_rrm_issue_scan_req(struct mac_context *mac_ctx, uint8_t idx)
 		uint64_t current_time;
 		struct scan_start_request *req;
 		struct wlan_objmgr_vdev *vdev;
-		uint32_t freq;
-
-		if (!sme_rrm_ctx->channelList.numOfChannels ||
-		    !sme_rrm_ctx->channelList.freq_list) {
-			sme_err("[802.11 RRM]: Global freq list is null");
-			status = QDF_STATUS_E_FAILURE;
-			goto send_ind;
-		}
+		uint32_t chan_num;
 
 		req = qdf_mem_malloc(sizeof(*req));
 		if (!req) {
@@ -964,13 +951,14 @@ sme_rrm_issue_scan_req(struct mac_context *mac_ctx, uint8_t idx)
 
 		/* set requestType to full scan */
 		req->scan_req.chan_list.num_chan = 1;
-		freq = sme_rrm_ctx->channelList.freq_list[
+		chan_num = sme_rrm_ctx->channelList.ChannelList[
 			   sme_rrm_ctx->currentIndex];
-		req->scan_req.chan_list.chan[0].freq = freq;
-		sme_debug("active duration %d passive %d On freq %d",
+		req->scan_req.chan_list.chan[0].freq =
+			wlan_chan_to_freq(chan_num);
+		sme_debug("active duration %d passive %d On channel %d freq %d",
 			  req->scan_req.dwell_time_active,
 			  req->scan_req.dwell_time_passive,
-			  req->scan_req.chan_list.chan[0].freq);
+			  chan_num, req->scan_req.chan_list.chan[0].freq);
 		/*
 		 * Fill RRM scan type for these requests. This is done
 		 * because in scan concurrency update params we update the
@@ -995,9 +983,9 @@ sme_rrm_issue_scan_req(struct mac_context *mac_ctx, uint8_t idx)
 		 * pScanResult->timer >= rrm_scan_timer
 		 */
 		rrm_scan_timer = 0;
-		freq_list = sme_rrm_ctx->channelList.freq_list;
-		if (!freq_list) {
-			sme_err("[802.11 RRM]: Global freq list is null");
+		chan_list = sme_rrm_ctx->channelList.ChannelList;
+		if (!chan_list) {
+			sme_err("[802.11 RRM]: Global channel list is null");
 			sme_reset_ese_bcn_req_in_progress(sme_rrm_ctx);
 			status = QDF_STATUS_E_FAILURE;
 			goto send_ind;
@@ -1008,7 +996,7 @@ sme_rrm_issue_scan_req(struct mac_context *mac_ctx, uint8_t idx)
 			if ((ch_idx + 1) <
 			    sme_rrm_ctx->channelList.numOfChannels) {
 				sme_rrm_send_scan_result(mac_ctx, idx, 1,
-							 &freq_list[ch_idx],
+							 &chan_list[ch_idx],
 							 false);
 				/* Advance the current index. */
 				sme_rrm_ctx->currentIndex++;
@@ -1019,7 +1007,7 @@ sme_rrm_issue_scan_req(struct mac_context *mac_ctx, uint8_t idx)
 				 * measurement done flag set.
 				 */
 				sme_rrm_send_scan_result(mac_ctx, idx, 1,
-							 &freq_list[ch_idx],
+							 &chan_list[ch_idx],
 							 true);
 				sme_reset_ese_bcn_req_in_progress(sme_rrm_ctx);
 				goto free_ch_lst;
@@ -1036,41 +1024,37 @@ sme_rrm_issue_scan_req(struct mac_context *mac_ctx, uint8_t idx)
 send_ind:
 	sme_rrm_send_beacon_report_xmit_ind(mac_ctx, idx, NULL, true, 0);
 free_ch_lst:
-	qdf_mem_free(sme_rrm_ctx->channelList.freq_list);
-	sme_rrm_ctx->channelList.freq_list = NULL;
-	sme_rrm_ctx->channelList.numOfChannels = 0;
+	qdf_mem_free(sme_rrm_ctx->channelList.ChannelList);
+	sme_rrm_ctx->channelList.ChannelList = NULL;
 	return status;
 }
 
-static QDF_STATUS sme_rrm_fill_scan_channels(struct mac_context *mac,
-					     uint8_t *country,
+static QDF_STATUS sme_rrm_fill_scan_channels(uint8_t *country,
 					     tpRrmSMEContext sme_rrm_context,
-					     uint8_t op_class,
+					     uint8_t reg_class,
 					     uint32_t num_channels)
 {
 	uint32_t num_chan = 0;
 	uint32_t i;
-	uint32_t *freq_list;
-	bool found;
 
-	freq_list = sme_rrm_context->channelList.freq_list;
-	found = false;
+	/* List all the channels in the requested RC */
+	wlan_reg_dmn_print_channels_in_opclass(country, reg_class);
+
 	for (i = 0; i < num_channels; i++) {
-		found = wlan_reg_country_opclass_freq_check(mac->pdev,
-							    country,
-							    op_class,
-							    freq_list[i]);
-		if (found) {
-			freq_list[num_chan] = freq_list[i];
+		if (wlan_reg_dmn_get_opclass_from_channel(country,
+			sme_rrm_context->channelList.ChannelList[i],
+			BWALL) ==
+			reg_class) {
+			sme_rrm_context->channelList.
+			ChannelList[num_chan] =
+			sme_rrm_context->channelList.ChannelList[i];
 			num_chan++;
 		}
-		found = false;
 	}
-
 	sme_rrm_context->channelList.numOfChannels = num_chan;
 	if (sme_rrm_context->channelList.numOfChannels == 0) {
-		qdf_mem_free(sme_rrm_context->channelList.freq_list);
-		sme_rrm_context->channelList.freq_list = NULL;
+		qdf_mem_free(sme_rrm_context->channelList.ChannelList);
+		sme_rrm_context->channelList.ChannelList = NULL;
 		sme_err("No channels populated with requested operation class and current country, Hence abort the rrm operation");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -1103,26 +1087,20 @@ static uint8_t *sme_rrm_get_meas_mode_string(uint8_t meas_mode)
  * Return : QDF_STATUS_SUCCESS - Validation is successful.
  */
 QDF_STATUS sme_rrm_process_beacon_report_req_ind(struct mac_context *mac,
-						 void *msg_buf)
+						void *msg_buf)
 {
-	tpSirBeaconReportReqInd beacon_req = (tpSirBeaconReportReqInd)msg_buf;
-	tpRrmSMEContext sme_rrm_ctx;
-	uint32_t len = 0, i = 0, j = 0;
+	tpSirBeaconReportReqInd pBeaconReq = (tpSirBeaconReportReqInd)msg_buf;
+	tpRrmSMEContext pSmeRrmContext;
+	uint32_t len = 0, i = 0;
 	uint8_t country[WNI_CFG_COUNTRY_CODE_LEN];
 	uint32_t session_id;
 	struct csr_roam_session *session;
 	QDF_STATUS status;
-	uint32_t num_chan, local_num_channel;
-	bool chan_valid;
-	uint32_t *rrm_freq_list, *local_rrm_freq_list;
-	uint32_t bcn_chan_freq, local_bcn_chan_freq;
-	tRrmPEContext rrm_context;
 
-	sme_rrm_ctx = &mac->rrm.rrmSmeContext[beacon_req->measurement_idx];
-	rrm_context = mac->rrm.rrmPEContext;
+	pSmeRrmContext = &mac->rrm.rrmSmeContext[pBeaconReq->measurement_idx];
 
 	status = csr_roam_get_session_id_from_bssid(mac, (struct qdf_mac_addr *)
-						    beacon_req->bssId,
+						    pBeaconReq->bssId,
 						    &session_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		sme_err("sme session ID not found for bssid");
@@ -1143,203 +1121,141 @@ QDF_STATUS sme_rrm_process_beacon_report_req_ind(struct mac_context *mac,
 	else
 		country[2] = OP_CLASS_GLOBAL;
 
-	sme_debug("RRM_SCN: Index:%d Request Reg class %d, AP's country code %c%c 0x%x, channel = %d",
-		  beacon_req->measurement_idx,
-		  beacon_req->channel_info.reg_class,
+	sme_debug("Request index:%d Reg class %d, AP's country code %c%c 0x%x Channel = %d",
+		  pBeaconReq->measurement_idx,
+		  pBeaconReq->channelInfo.regulatoryClass,
 		  country[0], country[1], country[2],
-		  beacon_req->channel_info.chan_num);
+		  pBeaconReq->channelInfo.channelNum);
 
-	if (beacon_req->channel_list.num_channels > SIR_ESE_MAX_MEAS_IE_REQS) {
+	if (pBeaconReq->channelList.numChannels >
+	    SIR_ESE_MAX_MEAS_IE_REQS) {
 		sme_err("Beacon report request numChannels:%u exceeds max num channels",
-			beacon_req->channel_list.num_channels);
+			pBeaconReq->channelList.numChannels);
 		status = QDF_STATUS_E_INVAL;
 		goto cleanup;
 	}
 
 	/* section 11.10.8.1 (IEEE Std 802.11k-2008) */
 	/* channel 0 and 255 has special meaning. */
-	if ((beacon_req->channel_info.chan_num == 0) ||
-	    ((beacon_req->channel_info.chan_num == 255) &&
-	     (beacon_req->channel_list.num_channels == 0))) {
+	if ((pBeaconReq->channelInfo.channelNum == 0) ||
+	    ((pBeaconReq->channelInfo.channelNum == 255)
+	     && (pBeaconReq->channelList.numChannels == 0))) {
 		/* Add all the channel in the regulatory domain. */
 		len = mac->mlme_cfg->reg.valid_channel_list_num;
-		if (sme_rrm_ctx->channelList.freq_list) {
-			qdf_mem_free(sme_rrm_ctx->channelList.freq_list);
-			sme_rrm_ctx->channelList.freq_list = NULL;
+		if (pSmeRrmContext->channelList.ChannelList) {
+			qdf_mem_free(pSmeRrmContext->channelList.ChannelList);
+			pSmeRrmContext->channelList.ChannelList = NULL;
 		}
-		sme_rrm_ctx->channelList.freq_list =
-			qdf_mem_malloc(sizeof(uint32_t) * len);
-		if (!sme_rrm_ctx->channelList.freq_list) {
+		pSmeRrmContext->channelList.ChannelList = qdf_mem_malloc(len);
+		if (!pSmeRrmContext->channelList.ChannelList) {
 			status = QDF_STATUS_E_NOMEM;
-			sme_rrm_ctx->channelList.numOfChannels = 0;
 			goto cleanup;
 		}
 
-		csr_get_cfg_valid_channels(
-			mac, sme_rrm_ctx->channelList.freq_list, &len);
+		csr_get_cfg_valid_channels(mac, pSmeRrmContext->channelList.
+					ChannelList, &len);
 
-		if (beacon_req->channel_info.reg_class) {
-			if (sme_rrm_fill_scan_channels(
-				mac, country, sme_rrm_ctx,
-				beacon_req->channel_info.reg_class, len) !=
+		if (pBeaconReq->channelInfo.regulatoryClass) {
+			if (sme_rrm_fill_scan_channels(country, pSmeRrmContext,
+						       pBeaconReq->channelInfo.
+						       regulatoryClass, len) !=
 			    QDF_STATUS_SUCCESS)
 				goto cleanup;
 		} else {
-			sme_rrm_ctx->channelList.numOfChannels = len;
+			pSmeRrmContext->channelList.numOfChannels = len;
 		}
 	} else {
 		len = 0;
-		sme_rrm_ctx->channelList.numOfChannels = 0;
-		num_chan = 0;
+		pSmeRrmContext->channelList.numOfChannels = 0;
 
 		/* If valid channel is present. We first Measure on the given
 		 * channel and if there are additional channels present in
 		 * APchannelreport, measure on these also.
 		 */
-		if (beacon_req->channel_info.chan_num != 255)
+		if (pBeaconReq->channelInfo.channelNum != 255)
 			len = 1;
 
-		len += beacon_req->channel_list.num_channels;
+		len += pBeaconReq->channelList.numChannels;
 
-		if (sme_rrm_ctx->channelList.freq_list) {
-			qdf_mem_free(sme_rrm_ctx->channelList.freq_list);
-			sme_rrm_ctx->channelList.freq_list = NULL;
+		if (pSmeRrmContext->channelList.ChannelList) {
+			qdf_mem_free(pSmeRrmContext->channelList.ChannelList);
+			pSmeRrmContext->channelList.ChannelList = NULL;
 		}
-		sme_rrm_ctx->channelList.freq_list =
-			qdf_mem_malloc(sizeof(uint32_t) * len);
-		if (!sme_rrm_ctx->channelList.freq_list) {
-			sme_rrm_ctx->channelList.numOfChannels = 0;
+		pSmeRrmContext->channelList.ChannelList = qdf_mem_malloc(len);
+		if (!pSmeRrmContext->channelList.ChannelList) {
 			status = QDF_STATUS_E_NOMEM;
 			goto cleanup;
 		}
 
-		rrm_freq_list = sme_rrm_ctx->channelList.freq_list;
-		bcn_chan_freq = beacon_req->channel_info.chan_freq;
-
-		if (beacon_req->channel_info.chan_num != 255) {
-			chan_valid =
-				csr_roam_is_channel_valid(mac, bcn_chan_freq);
-
-			if (chan_valid) {
-				rrm_freq_list[num_chan] = bcn_chan_freq;
-				num_chan++;
-			} else {
+		if (pBeaconReq->channelInfo.channelNum != 255) {
+			if (csr_roam_is_channel_valid
+				    (mac, pBeaconReq->channelInfo.channelNum))
+				pSmeRrmContext->channelList.
+				ChannelList[pSmeRrmContext->channelList.
+					    numOfChannels++] =
+					pBeaconReq->channelInfo.channelNum;
+			else
 				sme_err("Invalid channel: %d",
-					beacon_req->channel_info.chan_num);
-			}
+					pBeaconReq->channelInfo.channelNum);
 		}
 
-		for (i = 0; i < beacon_req->channel_list.num_channels; i++) {
-			bcn_chan_freq =
-				beacon_req->channel_list.chan_freq_lst[i];
-			chan_valid =
-				csr_roam_is_channel_valid(mac, bcn_chan_freq);
-
-			if (chan_valid) {
-				rrm_freq_list[num_chan] = bcn_chan_freq;
-				num_chan++;
+		for (i = 0; i < pBeaconReq->channelList.numChannels; i++) {
+			if (csr_roam_is_channel_valid(mac, pBeaconReq->
+					channelList.channelNumber[i])) {
+				pSmeRrmContext->channelList.
+					ChannelList[pSmeRrmContext->channelList.
+				numOfChannels] = pBeaconReq->channelList.
+					channelNumber[i];
+				pSmeRrmContext->channelList.numOfChannels++;
 			}
-		}
-
-		sme_rrm_ctx->channelList.numOfChannels = num_chan;
-	}
-
-	local_rrm_freq_list = sme_rrm_ctx->channelList.freq_list;
-	local_num_channel = 0;
-	for (i = 0; i < sme_rrm_ctx->channelList.numOfChannels; i++) {
-		local_bcn_chan_freq = local_rrm_freq_list[i];
-		chan_valid = true;
-
-		if (beacon_req->measurement_idx > 0) {
-			for (j = 0; j < rrm_context.beacon_rpt_chan_num; j ++) {
-				if (rrm_context.beacon_rpt_chan_list[j] ==
-				    local_bcn_chan_freq) {
-				/*
-				 * Ignore this channel, As this is already
-				 * included in previous request
-				 */
-					chan_valid = false;
-					break;
-				}
-			}
-		}
-
-		if (chan_valid) {
-			rrm_context.
-			beacon_rpt_chan_list[rrm_context.beacon_rpt_chan_num] =
-							local_bcn_chan_freq;
-			rrm_context.beacon_rpt_chan_num++;
-
-			if (rrm_context.beacon_rpt_chan_num >=
-			    MAX_NUM_CHANNELS) {
-			    /* this should never happen */
-				sme_err("Reset beacon_rpt_chan_num : %d",
-					rrm_context.beacon_rpt_chan_num);
-				rrm_context.beacon_rpt_chan_num = 0;
-			}
-			local_rrm_freq_list[local_num_channel] =
-							local_bcn_chan_freq;
-			local_num_channel++;
 		}
 	}
-
-	if (local_num_channel == 0)
-		goto cleanup;
-
-	sme_rrm_ctx->channelList.numOfChannels = local_num_channel;
 
 	/* Copy session bssid */
-	qdf_mem_copy(sme_rrm_ctx->sessionBssId.bytes, beacon_req->bssId,
+	qdf_mem_copy(pSmeRrmContext->sessionBssId.bytes, pBeaconReq->bssId,
 		     sizeof(tSirMacAddr));
 
 	/* copy measurement bssid */
-	qdf_mem_copy(sme_rrm_ctx->bssId, beacon_req->macaddrBssid,
+	qdf_mem_copy(pSmeRrmContext->bssId, pBeaconReq->macaddrBssid,
 		     sizeof(tSirMacAddr));
 
 	/* Copy ssid */
-	qdf_mem_copy(&sme_rrm_ctx->ssId, &beacon_req->ssId,
+	qdf_mem_copy(&pSmeRrmContext->ssId, &pBeaconReq->ssId,
 		     sizeof(tAniSSID));
 
-	sme_rrm_ctx->token = beacon_req->uDialogToken;
-	sme_rrm_ctx->regClass = beacon_req->channel_info.reg_class;
-	sme_rrm_ctx->randnIntvl =
-		QDF_MAX(beacon_req->randomizationInterval,
+	pSmeRrmContext->token = pBeaconReq->uDialogToken;
+	pSmeRrmContext->regClass = pBeaconReq->channelInfo.regulatoryClass;
+	pSmeRrmContext->randnIntvl =
+		QDF_MAX(pBeaconReq->randomizationInterval,
 			mac->rrm.rrmConfig.max_randn_interval);
-	sme_rrm_ctx->currentIndex = 0;
-	sme_rrm_ctx->msgSource = beacon_req->msgSource;
-	qdf_mem_copy((uint8_t *)&sme_rrm_ctx->measMode,
-		     (uint8_t *)&beacon_req->fMeasurementtype,
+	pSmeRrmContext->currentIndex = 0;
+	pSmeRrmContext->msgSource = pBeaconReq->msgSource;
+	qdf_mem_copy((uint8_t *) &pSmeRrmContext->measMode,
+		     (uint8_t *) &pBeaconReq->fMeasurementtype,
 		     SIR_ESE_MAX_MEAS_IE_REQS);
-	qdf_mem_copy((uint8_t *)&sme_rrm_ctx->duration,
-		     (uint8_t *)&beacon_req->measurementDuration,
+	qdf_mem_copy((uint8_t *) &pSmeRrmContext->duration,
+		     (uint8_t *) &pBeaconReq->measurementDuration,
 		     SIR_ESE_MAX_MEAS_IE_REQS);
 
 	sme_debug("token: %d randnIntvl: %d msgSource: %d measurementduration %d, rrm_ctx duration %d Meas_mode: %s",
-		  sme_rrm_ctx->token, sme_rrm_ctx->randnIntvl,
-		  sme_rrm_ctx->msgSource, beacon_req->measurementDuration[0],
-		  sme_rrm_ctx->duration[0],
-		  sme_rrm_get_meas_mode_string(sme_rrm_ctx->measMode[0]));
+		pSmeRrmContext->token, pSmeRrmContext->randnIntvl,
+		pSmeRrmContext->msgSource, pBeaconReq->measurementDuration[0],
+		pSmeRrmContext->duration[0], sme_rrm_get_meas_mode_string(
+						 pSmeRrmContext->measMode[0]));
 
-	return sme_rrm_issue_scan_req(mac, beacon_req->measurement_idx);
+	return sme_rrm_issue_scan_req(mac, pBeaconReq->measurement_idx);
 
 cleanup:
-	if (beacon_req->msgSource == eRRM_MSG_SOURCE_11K) {
+	if (pBeaconReq->msgSource == eRRM_MSG_SOURCE_11K) {
 		/* Copy session bssid */
-		qdf_mem_copy(sme_rrm_ctx->sessionBssId.bytes,
-			     beacon_req->bssId, sizeof(tSirMacAddr));
+		qdf_mem_copy(pSmeRrmContext->sessionBssId.bytes,
+			     pBeaconReq->bssId, sizeof(tSirMacAddr));
 
 		/* copy measurement bssid */
-		qdf_mem_copy(sme_rrm_ctx->bssId, beacon_req->macaddrBssid,
+		qdf_mem_copy(pSmeRrmContext->bssId, pBeaconReq->macaddrBssid,
 			     sizeof(tSirMacAddr));
-		sme_rrm_ctx->token = beacon_req->uDialogToken;
-		sme_rrm_ctx->regClass =
-			beacon_req->channel_info.reg_class;
-		sme_rrm_ctx->randnIntvl =
-			QDF_MAX(beacon_req->randomizationInterval,
-			mac->rrm.rrmConfig.max_randn_interval);
-
 		sme_rrm_send_beacon_report_xmit_ind(mac,
-			     sme_rrm_ctx->measurement_idx, NULL, true, 0);
+			     pSmeRrmContext->measurement_idx, NULL, true, 0);
 	}
 
 	return status;
@@ -1622,8 +1538,8 @@ static QDF_STATUS sme_rrm_process_neighbor_report(struct mac_context *mac,
 			     sizeof(tSirNeighborBssDescription));
 
 		sme_debug("Received neighbor report with Neighbor BSSID: "
-			QDF_MAC_ADDR_FMT,
-			QDF_MAC_ADDR_REF(
+			QDF_MAC_ADDR_STR,
+			QDF_MAC_ADDR_ARRAY(
 			       neighbor_rpt->sNeighborBssDescription[i].bssId));
 
 		rrm_calculate_neighbor_ap_roam_score(mac, neighbor_rpt_desc);
@@ -1633,9 +1549,9 @@ static QDF_STATUS sme_rrm_process_neighbor_report(struct mac_context *mac,
 					mac, neighbor_rpt_desc,
 					neighbor_rpt->measurement_idx);
 		} else {
-			sme_err("Roam score of BSSID  " QDF_MAC_ADDR_FMT
+			sme_err("Roam score of BSSID  " QDF_MAC_ADDR_STR
 				" is 0, Ignoring..",
-				QDF_MAC_ADDR_REF(neighbor_rpt->
+				QDF_MAC_ADDR_ARRAY(neighbor_rpt->
 					       sNeighborBssDescription[i].
 					       bssId));
 
@@ -1746,8 +1662,6 @@ static void rrm_change_default_config_param(struct mac_context *mac)
 {
 	mac->rrm.rrmConfig.rrm_enabled =
 			mac->mlme_cfg->rrm_config.rrm_enabled;
-	mac->rrm.rrmConfig.sap_rrm_enabled =
-			mac->mlme_cfg->rrm_config.sap_rrm_enabled;
 	mac->rrm.rrmConfig.max_randn_interval =
 			mac->mlme_cfg->rrm_config.rrm_rand_interval;
 
@@ -1843,9 +1757,9 @@ QDF_STATUS rrm_close(struct mac_context *mac)
 				sme_err("Timer stop fail");
 		}
 
-		if (pSmeRrmContext->channelList.freq_list) {
-			qdf_mem_free(pSmeRrmContext->channelList.freq_list);
-			pSmeRrmContext->channelList.freq_list = NULL;
+		if (pSmeRrmContext->channelList.ChannelList) {
+			qdf_mem_free(pSmeRrmContext->channelList.ChannelList);
+			pSmeRrmContext->channelList.ChannelList = NULL;
 			pSmeRrmContext->channelList.numOfChannels = 0;
 		}
 

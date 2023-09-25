@@ -79,19 +79,13 @@ enum p2p_frame_type {
  * enum p2p_frame_sub_type - frame sub type
  * @P2P_MGMT_PROBE_REQ:       probe request frame
  * @P2P_MGMT_PROBE_RSP:       probe response frame
- * @P2P_MGMT_DISASSOC:        disassociation frame
- * @P2P_MGMT_AUTH:            authentication frame
- * @P2P_MGMT_DEAUTH:          deauthentication frame
  * @P2P_MGMT_ACTION:          action frame
  * @P2P_MGMT_NOT_SUPPORT:     not support sub frame type
  */
 enum p2p_frame_sub_type {
 	P2P_MGMT_PROBE_REQ = 4,
 	P2P_MGMT_PROBE_RSP,
-	P2P_MGMT_DISASSOC = 10,
-	P2P_MGMT_AUTH,
-	P2P_MGMT_DEAUTH,
-	P2P_MGMT_ACTION,
+	P2P_MGMT_ACTION = 13,
 	P2P_MGMT_NOT_SUPPORT,
 };
 
@@ -341,6 +335,7 @@ struct tx_action_context *p2p_find_tx_ctx_by_nbuf(
  * @soc: soc object
  * @vdev_id: vdev id
  * @rnd_cookie: random mac mgmt tx cookie
+ * @duration: timeout value to flush the addr in target.
  *
  * This function will del the mac addr filter from vdev random mac addr list.
  * If there is no reference to mac addr, it will set a clear timer to flush it
@@ -351,26 +346,7 @@ struct tx_action_context *p2p_find_tx_ctx_by_nbuf(
  */
 QDF_STATUS
 p2p_del_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
-		   uint64_t rnd_cookie);
-
-/**
- * p2p_random_mac_handle_tx_done() - del mac filter from given vdev rand mac
- * list when mgmt tx done
- * @soc: soc object
- * @vdev_id: vdev id
- * @rnd_cookie: random mac mgmt tx cookie
- * @duration: timeout value to flush the addr in target.
- *
- * This function will del the mac addr filter from vdev random mac addr list
- * and also remove the filter from firmware if duration is zero else start
- * the timer for that duration.
- *
- * Return: QDF_STATUS_SUCCESS - del successfully.
- *		other : failed to del the mac address entry.
- */
-QDF_STATUS
-p2p_random_mac_handle_tx_done(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
-			      uint64_t rnd_cookie, uint32_t duration);
+		   uint64_t rnd_cookie, uint32_t duration);
 
 /**
  * p2p_check_random_mac() - check random mac addr or not
@@ -458,16 +434,5 @@ void p2p_init_random_mac_vdev(struct p2p_vdev_priv_obj *p2p_vdev_obj);
  * Return: void
  */
 void p2p_deinit_random_mac_vdev(struct p2p_vdev_priv_obj *p2p_vdev_obj);
-
-/**
- * p2p_get_p2pie_ptr() - get the pointer to p2p ie
- * @ie:      source ie
- * @ie_len:  source ie length
- *
- * This function finds out p2p ie by p2p oui and return the pointer.
- *
- * Return: pointer to p2p ie
- */
-const uint8_t *p2p_get_p2pie_ptr(const uint8_t *ie, uint16_t ie_len);
 
 #endif /* _WLAN_P2P_OFF_CHAN_TX_H_ */

@@ -121,7 +121,6 @@ struct blm_reject_ap_timestamp {
  * @bad_bssid_counter: It represent how many times data stall happened.
  * @ap_timestamp: Ap timestamp.
  * @reject_ap_type: what is the type of rejection for the AP (avoid, black etc.)
- * @reject_ap_reason: reason for adding the BSSID to BLM
  * @connect_timestamp: Timestamp when the STA got connected with this BSSID
  */
 struct blm_reject_ap {
@@ -141,24 +140,6 @@ struct blm_reject_ap {
 		};
 		uint8_t reject_ap_type;
 	};
-	union {
-		struct {
-			uint32_t nud_fail:1,
-				 sta_kickout:1,
-				 ho_fail:1,
-				 poor_rssi:1,
-				 oce_assoc_reject:1,
-				 blacklist_userspace:1,
-				 avoid_userspace:1,
-				 btm_disassoc_imminent:1,
-				 btm_bss_termination:1,
-				 btm_mbo_retry:1,
-				 reassoc_rssi_reject:1,
-				 no_more_stas:1;
-		};
-		uint32_t reject_ap_reason;
-	};
-	enum blm_reject_ap_source source;
 	qdf_time_t connect_timestamp;
 };
 
@@ -216,16 +197,6 @@ void
 blm_send_reject_ap_list_to_fw(struct wlan_objmgr_pdev *pdev,
 			      qdf_list_t *reject_db_list,
 			      struct blm_config *cfg);
-
-/**
- * blm_update_reject_ap_list_to_fw() - Send the blacklist BSSIDs to FW
- * @psoc: psoc object
- *
- * This API will send the blacklist BSSIDs to FW.
- *
- * Return: None
- */
-void blm_update_reject_ap_list_to_fw(struct wlan_objmgr_psoc *psoc);
 
 /**
  * blm_add_userspace_black_list() - Clear already existing userspace BSSID, and

@@ -1,13 +1,3 @@
-ENABLE_QCACLD := true
-ifeq ($(TARGET_USES_QMAA), true)
-ifneq ($(TARGET_USES_QMAA_OVERRIDE_WLAN), true)
-ENABLE_QCACLD := false
-else
-ENABLE_QCACLD := true
-endif
-endif
-
-ifeq  ($(ENABLE_QCACLD), true)
 # Android makefile for the WLAN Module
 LOCAL_PATH := $(call my-dir)
 
@@ -68,9 +58,7 @@ include $(foreach chip, $(TARGET_WLAN_CHIP), $(LOCAL_PATH)/.$(chip)/Android.mk)
 
 else # Multi-ok check
 
-ifeq ($(WLAN_PROFILE),)
 WLAN_PROFILE := default
-endif
 
 ifeq ($(LOCAL_DEV_NAME), qcacld-3.0)
 
@@ -177,4 +165,3 @@ endif # Multi-ko check
 endif # DLKM check
 endif # supported target check
 endif # WLAN enabled check
-endif # ENABLE_QCACLD

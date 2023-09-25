@@ -68,8 +68,6 @@ ol_tx_queue_vdev_flush(struct ol_txrx_pdev_t *pdev, struct ol_txrx_vdev_t *vdev)
 	struct ol_txrx_peer_t *peer, *peers[PEER_ARRAY_COUNT];
 	int i, j, peer_count;
 
-	ol_tx_hl_queue_flush_all(vdev);
-
 	/* flush VDEV TX queues */
 	for (i = 0; i < OL_TX_VDEV_NUM_QUEUES; i++) {
 		txq = &vdev->txqs[i];
@@ -519,25 +517,6 @@ ol_txrx_peer_tid_unpause_base(
 		}
 	}
 }
-
-/**
- * ol_txrx_peer_unpause_base() - unpause all txqs for a given peer
- * @pdev: the physical device object
- * @peer: peer device object
- *
- * Return: None
- */
-static void
-ol_txrx_peer_unpause_base(
-	struct ol_txrx_pdev_t *pdev,
-	struct ol_txrx_peer_t *peer)
-{
-	int i;
-
-	for (i = 0; i < QDF_ARRAY_SIZE(peer->txqs); i++)
-		ol_txrx_peer_tid_unpause_base(pdev, peer, i);
-}
-
 #ifdef QCA_BAD_PEER_TX_FLOW_CL
 /**
  * ol_txrx_peer_unpause_but_no_mgmt_q_base() - unpause all txqs except
@@ -585,37 +564,21 @@ ol_txrx_peer_tid_unpause(ol_txrx_peer_handle peer, int tid)
 }
 
 void
-ol_txrx_vdev_pause(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
-		   uint32_t reason, uint32_t pause_type)
+ol_txrx_vdev_pause(struct cdp_vdev *pvdev, uint32_t reason)
 {
-	struct ol_txrx_vdev_t *vdev =
-		(struct ol_txrx_vdev_t *)ol_txrx_get_vdev_from_vdev_id(vdev_id);
-	struct ol_txrx_pdev_t *pdev;
+	struct ol_txrx_vdev_t *vdev = (struct ol_txrx_vdev_t *)pvdev;
+	struct ol_txrx_pdev_t *pdev = vdev->pdev;
 	struct ol_txrx_peer_t *peer;
 	/* TO DO: log the queue pause */
 	/* acquire the mutex lock, since we'll be modifying the queues */
 	TX_SCHED_DEBUG_PRINT("Enter %s\n", __func__);
 
-	if (qdf_unlikely(!vdev)) {
-		ol_txrx_err("vdev is NULL");
-		return;
-	}
-
-	pdev = vdev->pdev;
 
 	/* use peer_ref_mutex before accessing peer_list */
 	qdf_spin_lock_bh(&pdev->peer_ref_mutex);
 	qdf_spin_lock_bh(&pdev->tx_queue_spinlock);
 	TAILQ_FOREACH(peer, &vdev->peer_list, peer_list_elem) {
-		if (pause_type == PAUSE_TYPE_CHOP) {
-			if (!(peer->is_tdls_peer && peer->tdls_offchan_enabled))
-				ol_txrx_peer_pause_base(pdev, peer);
-		} else if (pause_type == PAUSE_TYPE_CHOP_TDLS_OFFCHAN) {
-			if (peer->is_tdls_peer && peer->tdls_offchan_enabled)
-				ol_txrx_peer_pause_base(pdev, peer);
-		} else {
-			ol_txrx_peer_pause_base(pdev, peer);
-		}
+		ol_txrx_peer_pause_base(pdev, peer);
 	}
 	qdf_spin_unlock_bh(&pdev->tx_queue_spinlock);
 	qdf_spin_unlock_bh(&pdev->peer_ref_mutex);
@@ -623,39 +586,28 @@ ol_txrx_vdev_pause(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	TX_SCHED_DEBUG_PRINT("Leave %s\n", __func__);
 }
 
-void ol_txrx_vdev_unpause(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
-			  uint32_t reason, uint32_t pause_type)
+
+void ol_txrx_vdev_unpause(struct cdp_vdev *pvdev, uint32_t reason)
 {
-	struct ol_txrx_vdev_t *vdev =
-		(struct ol_txrx_vdev_t *)ol_txrx_get_vdev_from_vdev_id(vdev_id);
-	struct ol_txrx_pdev_t *pdev;
+	struct ol_txrx_vdev_t *vdev = (struct ol_txrx_vdev_t *)pvdev;
+	struct ol_txrx_pdev_t *pdev = vdev->pdev;
 	struct ol_txrx_peer_t *peer;
 
 	/* TO DO: log the queue unpause */
 	/* acquire the mutex lock, since we'll be modifying the queues */
 	TX_SCHED_DEBUG_PRINT("Enter %s\n", __func__);
 
-	if (qdf_unlikely(!vdev)) {
-		ol_txrx_err("vdev is NULL");
-		return;
-	}
 
-	pdev = vdev->pdev;
 
 	/* take peer_ref_mutex before accessing peer_list */
 	qdf_spin_lock_bh(&pdev->peer_ref_mutex);
 	qdf_spin_lock_bh(&pdev->tx_queue_spinlock);
 
 	TAILQ_FOREACH(peer, &vdev->peer_list, peer_list_elem) {
-		if (pause_type == PAUSE_TYPE_CHOP) {
-			if (!(peer->is_tdls_peer && peer->tdls_offchan_enabled))
-				ol_txrx_peer_unpause_base(pdev, peer);
-		} else if (pause_type == PAUSE_TYPE_CHOP_TDLS_OFFCHAN) {
-			if (peer->is_tdls_peer && peer->tdls_offchan_enabled)
-				ol_txrx_peer_unpause_base(pdev, peer);
-		} else {
-			ol_txrx_peer_unpause_base(pdev, peer);
-		}
+		int i;
+
+		for (i = 0; i < QDF_ARRAY_SIZE(peer->txqs); i++)
+			ol_txrx_peer_tid_unpause_base(pdev, peer, i);
 	}
 	qdf_spin_unlock_bh(&pdev->tx_queue_spinlock);
 	qdf_spin_unlock_bh(&pdev->peer_ref_mutex);
@@ -663,18 +615,9 @@ void ol_txrx_vdev_unpause(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	TX_SCHED_DEBUG_PRINT("Leave %s\n", __func__);
 }
 
-void ol_txrx_vdev_flush(struct cdp_soc_t *soc_hdl, uint8_t vdev_id)
+void ol_txrx_vdev_flush(struct cdp_vdev *pvdev)
 {
-	struct ol_txrx_vdev_t *vdev =
-		(struct ol_txrx_vdev_t *)ol_txrx_get_vdev_from_vdev_id(vdev_id);
-
-	if (qdf_unlikely(!vdev)) {
-		ol_txrx_err("vdev is NULL");
-		return;
-	}
-
-	if (!vdev)
-		return;
+	struct ol_txrx_vdev_t *vdev = (struct ol_txrx_vdev_t *)pvdev;
 
 	ol_tx_queue_vdev_flush(vdev->pdev, vdev);
 }
@@ -874,11 +817,10 @@ ol_tx_bad_peer_update_tx_limit(struct ol_txrx_pdev_t *pdev,
 }
 
 void
-ol_txrx_bad_peer_txctl_set_setting(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
+ol_txrx_bad_peer_txctl_set_setting(struct cdp_pdev *ppdev,
 				   int enable, int period, int txq_limit)
 {
-	struct ol_txrx_soc_t *soc = cdp_soc_t_to_ol_txrx_soc_t(soc_hdl);
-	ol_txrx_pdev_handle pdev = ol_txrx_get_pdev_from_pdev_id(soc, pdev_id);
+	struct ol_txrx_pdev_t *pdev = (struct ol_txrx_pdev_t *)ppdev;
 
 	if (enable)
 		pdev->tx_peer_bal.enabled = ol_tx_peer_bal_enable;
@@ -891,12 +833,11 @@ ol_txrx_bad_peer_txctl_set_setting(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 }
 
 void
-ol_txrx_bad_peer_txctl_update_threshold(struct cdp_soc_t *soc_hdl,
-					uint8_t pdev_id, int level,
-					int tput_thresh, int tx_limit)
+ol_txrx_bad_peer_txctl_update_threshold(struct cdp_pdev *ppdev,
+					int level, int tput_thresh,
+					int tx_limit)
 {
-	struct ol_txrx_soc_t *soc = cdp_soc_t_to_ol_txrx_soc_t(soc_hdl);
-	ol_txrx_pdev_handle pdev = ol_txrx_get_pdev_from_pdev_id(soc, pdev_id);
+	struct ol_txrx_pdev_t *pdev = (struct ol_txrx_pdev_t *)ppdev;
 
 	/* Set the current settingl */
 	pdev->tx_peer_bal.ctl_thresh[level].tput_thresh =
@@ -1336,11 +1277,11 @@ ol_tx_queue_log_record_display(struct ol_txrx_pdev_t *pdev, int offset)
 			if (peer)
 				QDF_TRACE(QDF_MODULE_ID_TXRX,
 					  QDF_TRACE_LEVEL_ERROR,
-					  "Q: %6d  %5d  %3d  %4d ("QDF_MAC_ADDR_FMT")",
+					  "Q: %6d  %5d  %3d  %4d ("QDF_MAC_ADDR_STR")",
 					  record.num_frms, record.num_bytes,
 					  record.tid,
 					  record.peer_id,
-					  QDF_MAC_ADDR_REF(peer->mac_addr.raw));
+					  QDF_MAC_ADDR_ARRAY(peer->mac_addr.raw));
 			else
 				QDF_TRACE(QDF_MODULE_ID_TXRX,
 					  QDF_TRACE_LEVEL_ERROR,
@@ -1370,11 +1311,11 @@ ol_tx_queue_log_record_display(struct ol_txrx_pdev_t *pdev, int offset)
 			if (peer)
 				QDF_TRACE(QDF_MODULE_ID_TXRX,
 					  QDF_TRACE_LEVEL_ERROR,
-					  "DQ: %6d  %5d  %3d  %4d ("QDF_MAC_ADDR_FMT")",
+					  "DQ: %6d  %5d  %3d  %4d ("QDF_MAC_ADDR_STR")",
 					  record.num_frms, record.num_bytes,
 					  record.tid,
 					  record.peer_id,
-					  QDF_MAC_ADDR_REF(peer->mac_addr.raw));
+					  QDF_MAC_ADDR_ARRAY(peer->mac_addr.raw));
 			else
 				QDF_TRACE(QDF_MODULE_ID_TXRX,
 					  QDF_TRACE_LEVEL_ERROR,
@@ -1404,11 +1345,11 @@ ol_tx_queue_log_record_display(struct ol_txrx_pdev_t *pdev, int offset)
 			if (peer)
 				QDF_TRACE(QDF_MODULE_ID_TXRX,
 					  QDF_TRACE_LEVEL_ERROR,
-					  "F: %6d  %5d  %3d  %4d ("QDF_MAC_ADDR_FMT")",
+					  "F: %6d  %5d  %3d  %4d ("QDF_MAC_ADDR_STR")",
 					  record.num_frms, record.num_bytes,
 					  record.tid,
 					  record.peer_id,
-					  QDF_MAC_ADDR_REF(peer->mac_addr.raw));
+					  QDF_MAC_ADDR_ARRAY(peer->mac_addr.raw));
 			else
 				QDF_TRACE(QDF_MODULE_ID_TXRX,
 					  QDF_TRACE_LEVEL_ERROR,
@@ -1742,8 +1683,9 @@ void ol_txrx_pdev_pause(struct ol_txrx_pdev_t *pdev, uint32_t reason)
 	struct ol_txrx_vdev_t *vdev = NULL, *tmp;
 
 	TAILQ_FOREACH_SAFE(vdev, &pdev->vdev_list, vdev_list_elem, tmp) {
-		cdp_fc_vdev_pause(cds_get_context(QDF_MODULE_ID_SOC),
-				  vdev->vdev_id, reason, 0);
+		cdp_fc_vdev_pause(
+			cds_get_context(QDF_MODULE_ID_SOC),
+			(struct cdp_vdev *)vdev, reason);
 	}
 
 }
@@ -1761,7 +1703,7 @@ void ol_txrx_pdev_unpause(struct ol_txrx_pdev_t *pdev, uint32_t reason)
 
 	TAILQ_FOREACH_SAFE(vdev, &pdev->vdev_list, vdev_list_elem, tmp) {
 		cdp_fc_vdev_unpause(cds_get_context(QDF_MODULE_ID_SOC),
-				    vdev->vdev_id, reason, 0);
+				    (struct cdp_vdev *)vdev, reason);
 	}
 
 }

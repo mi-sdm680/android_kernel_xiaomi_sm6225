@@ -604,10 +604,9 @@ lim_validate_access_policy(struct mac_context *mac,
 	}
 
 	if (retval != QDF_STATUS_SUCCESS)
-		pe_warn("accPol: %d lle: %d wme: %d wsm: %d sta mac "
-			QDF_MAC_ADDR_FMT, accessPolicy, pSta->lleEnabled,
-			pSta->wmeEnabled, pSta->wsmEnabled,
-			QDF_MAC_ADDR_REF(pSta->staAddr));
+		pe_warn("accPol: %d staId: %d lle: %d wme: %d wsm: %d",
+			accessPolicy, pSta->staIndex, pSta->lleEnabled,
+			pSta->wmeEnabled, pSta->wsmEnabled);
 
 	return retval;
 }
@@ -793,6 +792,7 @@ QDF_STATUS lim_admit_control_init(struct mac_context *mac)
    \fn lim_send_hal_msg_add_ts
    \brief Send halMsg_AddTs to HAL
    \param   struct mac_context *mac
+   \param     uint16_t        staIdx
    \param     uint8_t         tspecIdx
    \param       struct mac_tspec_ie tspecIE
    \param       tSirTclasInfo   *tclasInfo
@@ -803,12 +803,14 @@ QDF_STATUS lim_admit_control_init(struct mac_context *mac)
 #ifdef FEATURE_WLAN_ESE
 QDF_STATUS
 lim_send_hal_msg_add_ts(struct mac_context *mac,
+			uint16_t staIdx,
 			uint8_t tspecIdx,
 			struct mac_tspec_ie tspecIE,
 			uint8_t sessionId, uint16_t tsm_interval)
 #else
 QDF_STATUS
 lim_send_hal_msg_add_ts(struct mac_context *mac,
+			uint16_t staIdx,
 			uint8_t tspecIdx,
 			struct mac_tspec_ie tspecIE,
 			uint8_t sessionId)
@@ -829,6 +831,7 @@ lim_send_hal_msg_add_ts(struct mac_context *mac,
 	if (!pAddTsParam)
 		return QDF_STATUS_E_NOMEM;
 
+	pAddTsParam->sta_idx = staIdx;
 	pAddTsParam->tspec_idx = tspecIdx;
 	qdf_mem_copy(&pAddTsParam->tspec, &tspecIE,
 		     sizeof(struct mac_tspec_ie));
@@ -867,6 +870,7 @@ lim_send_hal_msg_add_ts(struct mac_context *mac,
    \fn lim_send_hal_msg_del_ts
    \brief Send halMsg_AddTs to HAL
    \param   struct mac_context *mac
+   \param     uint16_t        staIdx
    \param     uint8_t         tspecIdx
    \param     tSirAddtsReqInfo addts
    \return QDF_STATUS - status
@@ -874,6 +878,7 @@ lim_send_hal_msg_add_ts(struct mac_context *mac,
 
 QDF_STATUS
 lim_send_hal_msg_del_ts(struct mac_context *mac,
+			uint16_t staIdx,
 			uint8_t tspecIdx,
 			struct delts_req_info delts,
 			uint8_t sessionId, uint8_t *bssId)
@@ -891,6 +896,7 @@ lim_send_hal_msg_del_ts(struct mac_context *mac,
 	msg.bodyval = 0;
 
 	/* filling message parameters. */
+	pDelTsParam->staIdx = staIdx;
 	pDelTsParam->tspecIdx = tspecIdx;
 	qdf_mem_copy(&pDelTsParam->bssId, bssId, sizeof(tSirMacAddr));
 
@@ -992,8 +998,8 @@ void lim_process_hal_add_ts_rsp(struct mac_context *mac,
 
 		/* Delete TSPEC */
 		/* 090803: Pull the hash table from the session */
-		pSta = dph_lookup_hash_entry(mac, peerMacAddr, &assocId,
-					     &pe_session->dph.dphHashTable);
+		pSta = dph_lookup_assoc_id(mac, pAddTsRspMsg->sta_idx, &assocId,
+					   &pe_session->dph.dphHashTable);
 		if (pSta)
 			lim_admit_control_delete_ts(mac, assocId,
 						    &pAddTsRspMsg->tspec.tsinfo,

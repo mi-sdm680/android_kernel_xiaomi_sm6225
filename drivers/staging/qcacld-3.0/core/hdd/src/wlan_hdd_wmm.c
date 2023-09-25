@@ -163,11 +163,13 @@ static void hdd_wmm_enable_tl_uapsd(struct hdd_wmm_qos_context *qos_context)
 					      &delayed_trgr_frm_int);
 	/* everything is in place to notify TL */
 	status =
-		sme_enable_uapsd_for_ac(ac_type, ac->tspec.ts_info.tid,
-					ac->tspec.ts_info.up,
-					service_interval, suspension_interval,
-					direction, psb, adapter->vdev_id,
-					delayed_trgr_frm_int);
+		sme_enable_uapsd_for_ac((WLAN_HDD_GET_STATION_CTX_PTR(adapter))->
+					   conn_info.sta_id[0], ac_type,
+					   ac->tspec.ts_info.tid,
+					   ac->tspec.ts_info.up,
+					   service_interval, suspension_interval,
+					   direction, psb, adapter->vdev_id,
+					   delayed_trgr_frm_int);
 
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("Failed to enable U-APSD for AC=%d", ac_type);
@@ -202,7 +204,10 @@ static void hdd_wmm_disable_tl_uapsd(struct hdd_wmm_qos_context *qos_context)
 
 	/* have we previously enabled UAPSD? */
 	if (ac->is_uapsd_info_valid == true) {
-		status = sme_disable_uapsd_for_ac(ac_type, adapter->vdev_id);
+		status =
+			sme_disable_uapsd_for_ac((WLAN_HDD_GET_STATION_CTX_PTR
+							     (adapter))->conn_info.sta_id[0],
+						    ac_type, adapter->vdev_id);
 
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			hdd_err("Failed to disable U-APSD for AC=%d", ac_type);
@@ -1680,51 +1685,6 @@ QDF_STATUS hdd_wmm_adapter_close(struct hdd_adapter *adapter)
 }
 
 /**
- * hdd_check_and_upgrade_udp_qos() - Check and upgrade the qos for UDP packets
- *				     if the current set priority is below the
- *				     pre-configured threshold for upgrade.
- * @adapter: [in] pointer to the adapter context (Should not be invalid)
- * @skb: [in] pointer to the packet to be transmitted
- * @user_pri: [out] priority set for this packet
- *
- * This function checks if the packet is a UDP packet and upgrades its
- * priority if its below the pre-configured upgrade threshold.
- * The upgrade order is as below:
- * BK -> BE -> VI -> VO
- *
- * Return: none
- */
-static inline void
-hdd_check_and_upgrade_udp_qos(struct hdd_adapter *adapter,
-			      qdf_nbuf_t skb,
-			      enum sme_qos_wmmuptype *user_pri)
-{
-	/* Upgrade UDP pkt priority alone */
-	if (!(qdf_nbuf_is_ipv4_udp_pkt(skb) || qdf_nbuf_is_ipv6_udp_pkt(skb)))
-		return;
-
-	switch (adapter->upgrade_udp_qos_threshold) {
-	case QCA_WLAN_AC_BK:
-		break;
-	case QCA_WLAN_AC_BE:
-		if (*user_pri == qca_wlan_ac_to_sme_qos(QCA_WLAN_AC_BK))
-			*user_pri = qca_wlan_ac_to_sme_qos(QCA_WLAN_AC_BE);
-
-		break;
-	case QCA_WLAN_AC_VI:
-	case QCA_WLAN_AC_VO:
-		if (*user_pri <
-		    qca_wlan_ac_to_sme_qos(adapter->upgrade_udp_qos_threshold))
-			*user_pri = qca_wlan_ac_to_sme_qos(
-					adapter->upgrade_udp_qos_threshold);
-
-		break;
-	default:
-		break;
-	}
-}
-
-/**
  * hdd_wmm_classify_pkt() - Function which will classify an OS packet
  * into a WMM AC based on DSCP
  *
@@ -1845,12 +1805,6 @@ void hdd_wmm_classify_pkt(struct hdd_adapter *adapter,
 	dscp = (tos >> 2) & 0x3f;
 	*user_pri = adapter->dscp_to_up_map[dscp];
 
-	/*
-	 * Upgrade the priority, if the user priority of this packet is
-	 * less than the configured threshold.
-	 */
-	hdd_check_and_upgrade_udp_qos(adapter, skb, user_pri);
-
 #ifdef HDD_WMM_DEBUG
 	hdd_debug("tos is %d, dscp is %d, up is %d", tos, dscp, *user_pri);
 #endif /* HDD_WMM_DEBUG */
@@ -1869,9 +1823,7 @@ static uint16_t __hdd_get_queue_index(uint16_t up)
 	return hdd_linux_up_to_ac_map[up];
 }
 
-#if defined(QCA_LL_TX_FLOW_CONTROL_V2) || \
-	defined(QCA_HL_NETDEV_FLOW_CONTROL) || \
-	defined(QCA_LL_PDEV_TX_FLOW_CONTROL)
+#if defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(QCA_HL_NETDEV_FLOW_CONTROL)
 /**
  * hdd_get_queue_index() - get queue index
  * @up: user priority
@@ -1946,13 +1898,7 @@ static uint16_t hdd_wmm_select_queue(struct net_device *dev,
 	return index;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
-uint16_t hdd_select_queue(struct net_device *dev, struct sk_buff *skb,
-			  struct net_device *sb_dev)
-{
-	return hdd_wmm_select_queue(dev, skb);
-}
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
 uint16_t hdd_select_queue(struct net_device *dev, struct sk_buff *skb,
 			  struct net_device *sb_dev,
 			  select_queue_fallback_t fallback)
@@ -2206,6 +2152,8 @@ QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *adapter,
 		}
 
 		status = sme_enable_uapsd_for_ac(
+				(WLAN_HDD_GET_STATION_CTX_PTR(
+				adapter))->conn_info.sta_id[0],
 				SME_AC_VO, 7, 7, srv_value, sus_value,
 				SME_QOS_WMM_TS_DIR_BOTH, 1,
 				adapter->vdev_id,
@@ -2229,6 +2177,8 @@ QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *adapter,
 		}
 
 		status = sme_enable_uapsd_for_ac(
+				(WLAN_HDD_GET_STATION_CTX_PTR(
+				adapter))->conn_info.sta_id[0],
 				SME_AC_VI, 5, 5, srv_value, sus_value,
 				SME_QOS_WMM_TS_DIR_BOTH, 1,
 				adapter->vdev_id,
@@ -2252,6 +2202,8 @@ QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *adapter,
 		}
 
 		status = sme_enable_uapsd_for_ac(
+				(WLAN_HDD_GET_STATION_CTX_PTR(
+				adapter))->conn_info.sta_id[0],
 				SME_AC_BK, 2, 2, srv_value, sus_value,
 				SME_QOS_WMM_TS_DIR_BOTH, 1,
 				adapter->vdev_id,
@@ -2275,6 +2227,8 @@ QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *adapter,
 		}
 
 		status = sme_enable_uapsd_for_ac(
+				(WLAN_HDD_GET_STATION_CTX_PTR(
+				adapter))->conn_info.sta_id[0],
 				SME_AC_BE, 3, 3, srv_value, sus_value,
 				SME_QOS_WMM_TS_DIR_BOTH, 1,
 				adapter->vdev_id,

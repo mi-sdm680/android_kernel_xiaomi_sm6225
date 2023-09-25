@@ -121,7 +121,7 @@ void dsc_vdev_destroy(struct dsc_vdev **out_vdev)
  * resumed after the current trans/op is completed. return QDF_STATUS_E_AGAIN
  * in this case.
  *
- * If there is a psoc transition taking place becasue of psoc idle shutdown,
+ * If there is a psoc transition taking place because of psoc idle shutdown,
  * then the vdev trans/ops should be rejected and queued in the DSC queue so
  * that it may be resumed after the current trans/ops is completed. Return
  * QDF_STATUS_E_AGAIN in this case.

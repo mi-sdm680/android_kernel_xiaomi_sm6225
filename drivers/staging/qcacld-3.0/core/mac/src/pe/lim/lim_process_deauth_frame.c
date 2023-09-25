@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -75,13 +75,11 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 
 	pBody = WMA_GET_RX_MPDU_DATA(pRxPacketInfo);
 	frame_rssi = (int32_t)WMA_GET_RX_RSSI_NORMALIZED(pRxPacketInfo);
-#ifdef WLAN_FEATURE_11W
 	frameLen = WMA_GET_RX_PAYLOAD_LEN(pRxPacketInfo);
 	if (frameLen < sizeof(reasonCode)) {
 		pe_err("Deauth Frame length invalid %d", frameLen);
 		return ;
 	}
-#endif
 
 	if (LIM_IS_STA_ROLE(pe_session) &&
 	    ((eLIM_SME_WT_DISASSOC_STATE == pe_session->limSmeState) ||
@@ -149,9 +147,8 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 	/* Get reasonCode from Deauthentication frame body */
 	reasonCode = sir_read_u16(pBody);
 
-	pe_nofl_info("Deauth RX: vdev %d from "QDF_MAC_ADDR_FMT" for "QDF_MAC_ADDR_FMT" RSSI = %d reason %d mlm state = %d, sme state = %d systemrole = %d ",
-		     pe_session->vdev_id, QDF_MAC_ADDR_REF(pHdr->sa),
-		     QDF_MAC_ADDR_REF(pHdr->da), frame_rssi,
+	pe_nofl_info("Deauth RX: vdev %d from %pM for %pM RSSI = %d reason %d mlm state = %d, sme state = %d systemrole = %d ",
+		     pe_session->vdev_id, pHdr->sa, pHdr->da, frame_rssi,
 		     reasonCode, pe_session->limMlmState,
 		     pe_session->limSmeState,
 		     GET_LIM_SYSTEM_ROLE(pe_session));
@@ -177,8 +174,8 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 			/* Invalid reasonCode in received Deauthentication frame */
 			/* Log error and ignore the frame */
 			pe_err("received Deauth frame with invalid reasonCode %d from "
-				       QDF_MAC_ADDR_FMT, reasonCode,
-				       QDF_MAC_ADDR_REF(pHdr->sa));
+				       QDF_MAC_ADDR_STR, reasonCode,
+				       QDF_MAC_ADDR_ARRAY(pHdr->sa));
 
 			break;
 		}
@@ -197,8 +194,8 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 			/* Invalid reasonCode in received Deauth frame */
 			/* Log error and ignore the frame */
 			pe_err("received Deauth frame with invalid reasonCode %d from "
-				       QDF_MAC_ADDR_FMT, reasonCode,
-				       QDF_MAC_ADDR_REF(pHdr->sa));
+				       QDF_MAC_ADDR_STR, reasonCode,
+				       QDF_MAC_ADDR_ARRAY(pHdr->sa));
 
 			break;
 		}
@@ -206,9 +203,9 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 		/* Received Deauth frame in either IBSS */
 		/* or un-known role. Log and ignore it */
 		pe_err("received Deauth frame with reasonCode %d in role %d from "
-			QDF_MAC_ADDR_FMT, reasonCode,
+			QDF_MAC_ADDR_STR, reasonCode,
 			GET_LIM_SYSTEM_ROLE(pe_session),
-			QDF_MAC_ADDR_REF(pHdr->sa));
+			QDF_MAC_ADDR_ARRAY(pHdr->sa));
 
 		return;
 	}
@@ -261,10 +258,10 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 		}
 		if (!IS_REASSOC_BSSID(mac, pHdr->sa, pe_session)) {
 			pe_debug("Rcv Deauth from unknown/different "
-				"AP while ReAssoc. Ignore " QDF_MAC_ADDR_FMT
-				"limReAssocbssId : " QDF_MAC_ADDR_FMT,
-				QDF_MAC_ADDR_REF(pHdr->sa),
-				QDF_MAC_ADDR_REF(pe_session->limReAssocbssId));
+				"AP while ReAssoc. Ignore " QDF_MAC_ADDR_STR
+				"limReAssocbssId : " QDF_MAC_ADDR_STR,
+				QDF_MAC_ADDR_ARRAY(pHdr->sa),
+				QDF_MAC_ADDR_ARRAY(pe_session->limReAssocbssId));
 			return;
 		}
 
@@ -273,10 +270,10 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 		 */
 		if (!IS_CURRENT_BSSID(mac, pHdr->sa, pe_session)) {
 			pe_debug("received DeAuth from the New AP to "
-				"which ReAssoc is sent " QDF_MAC_ADDR_FMT
-				"pe_session->bssId: " QDF_MAC_ADDR_FMT,
-				QDF_MAC_ADDR_REF(pHdr->sa),
-				QDF_MAC_ADDR_REF(pe_session->bssId));
+				"which ReAssoc is sent " QDF_MAC_ADDR_STR
+				"pe_session->bssId: " QDF_MAC_ADDR_STR,
+				QDF_MAC_ADDR_ARRAY(pHdr->sa),
+				QDF_MAC_ADDR_ARRAY(pe_session->bssId));
 
 			lim_restore_pre_reassoc_state(mac,
 						      eSIR_SME_REASSOC_REFUSED,
@@ -293,7 +290,7 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 		if (!IS_CURRENT_BSSID(mac, pHdr->bssId, pe_session)) {
 			pe_err("received DeAuth from an AP other "
 				"than we're trying to join. Ignore. "
-				QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(pHdr->sa));
+				QDF_MAC_ADDR_STR, QDF_MAC_ADDR_ARRAY(pHdr->sa));
 
 			if (lim_search_pre_auth_list(mac, pHdr->sa)) {
 				pe_debug("Preauth entry exist. Deleting");
@@ -327,6 +324,7 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 	tLimMlmAssocCnf mlmAssocCnf;
 	uint16_t aid;
 	tpDphHashNode sta_ds;
+	tpSirAssocRsp assoc_rsp;
 
 	sta_ds = dph_lookup_hash_entry(mac_ctx, addr, &aid,
 				       &pe_session->dph.dphHashTable);
@@ -346,9 +344,9 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 			 */
 
 			pe_debug("received Deauth frame state %X with failure "
-				"code %d from " QDF_MAC_ADDR_FMT,
+				"code %d from " QDF_MAC_ADDR_STR,
 				pe_session->limMlmState, rc,
-				QDF_MAC_ADDR_REF(addr));
+				QDF_MAC_ADDR_ARRAY(addr));
 
 			lim_restore_from_auth_state(mac_ctx,
 				eSIR_SME_DEAUTH_WHILE_JOIN,
@@ -358,9 +356,9 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 
 		case eLIM_MLM_AUTHENTICATED_STATE:
 			pe_debug("received Deauth frame state %X with "
-				"reasonCode=%d from " QDF_MAC_ADDR_FMT,
+				"reasonCode=%d from " QDF_MAC_ADDR_STR,
 				pe_session->limMlmState, rc,
-				QDF_MAC_ADDR_REF(addr));
+				QDF_MAC_ADDR_ARRAY(addr));
 			/* / Issue Deauth Indication to SME. */
 			qdf_mem_copy((uint8_t *) &mlmDeauthInd.peerMacAddr,
 				addr, sizeof(tSirMacAddr));
@@ -384,9 +382,9 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 			 * if any and issue ASSOC_CNF to SME.
 			 */
 			pe_debug("received Deauth frame state %X with "
-				"reasonCode=%d from " QDF_MAC_ADDR_FMT,
+				"reasonCode=%d from " QDF_MAC_ADDR_STR,
 				pe_session->limMlmState, rc,
-				QDF_MAC_ADDR_REF(addr));
+				QDF_MAC_ADDR_ARRAY(addr));
 			if (lim_search_pre_auth_list(mac_ctx, addr))
 				lim_delete_pre_auth_node(mac_ctx, addr);
 
@@ -421,9 +419,9 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 		case eLIM_MLM_WT_ADD_STA_RSP_STATE:
 			pe_session->fDeauthReceived = true;
 			pe_debug("Received Deauth frame in state %X with Reason "
-				"Code %d from Peer" QDF_MAC_ADDR_FMT,
+				"Code %d from Peer" QDF_MAC_ADDR_STR,
 				pe_session->limMlmState, rc,
-				QDF_MAC_ADDR_REF(addr));
+				QDF_MAC_ADDR_ARRAY(addr));
 			return;
 
 		case eLIM_MLM_IDLE_STATE:
@@ -433,9 +431,9 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 				&& (STA_ENTRY_TDLS_PEER == sta_ds->staType)) {
 				pe_err("received Deauth frame in state %X with "
 					"reason code %d from Tdls peer"
-					QDF_MAC_ADDR_FMT,
+					QDF_MAC_ADDR_STR,
 					pe_session->limMlmState, rc,
-					QDF_MAC_ADDR_REF(addr));
+					QDF_MAC_ADDR_ARRAY(addr));
 			lim_send_sme_tdls_del_sta_ind(mac_ctx, sta_ds,
 							pe_session,
 							rc);
@@ -463,23 +461,23 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 
 		case eLIM_MLM_WT_REASSOC_RSP_STATE:
 			pe_err("received Deauth frame state %X with "
-				"reasonCode=%d from " QDF_MAC_ADDR_FMT,
+				"reasonCode=%d from " QDF_MAC_ADDR_STR,
 				pe_session->limMlmState, rc,
-				QDF_MAC_ADDR_REF(addr));
+				QDF_MAC_ADDR_ARRAY(addr));
 			break;
 
 		case eLIM_MLM_WT_FT_REASSOC_RSP_STATE:
 			pe_err("received Deauth frame in FT state %X with "
-				"reasonCode=%d from " QDF_MAC_ADDR_FMT,
+				"reasonCode=%d from " QDF_MAC_ADDR_STR,
 				pe_session->limMlmState, rc,
-				QDF_MAC_ADDR_REF(addr));
+				QDF_MAC_ADDR_ARRAY(addr));
 			break;
 
 		default:
 			pe_err("received Deauth frame in state %X with "
-				"reasonCode=%d from " QDF_MAC_ADDR_FMT,
+				"reasonCode=%d from " QDF_MAC_ADDR_STR,
 				pe_session->limMlmState, rc,
-				QDF_MAC_ADDR_REF(addr));
+				QDF_MAC_ADDR_ARRAY(addr));
 			return;
 		}
 		break;
@@ -510,9 +508,8 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 		 * Already in the process of deleting context for the peer
 		 * and received Deauthentication frame. Log and Ignore.
 		 */
-		pe_debug("Deletion is in progress (%d) for peer:"QDF_MAC_ADDR_FMT" in mlmState %d",
-			 sta_ds->sta_deletion_in_progress,
-			 QDF_MAC_ADDR_REF(addr),
+		pe_debug("Deletion is in progress (%d) for peer:%pM in mlmState %d",
+			 sta_ds->sta_deletion_in_progress, addr,
 			 sta_ds->mlmStaContext.mlmState);
 		return;
 	}
@@ -543,6 +540,10 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 			lim_delete_pre_auth_node(mac_ctx, addr);
 
 		if (pe_session->limAssocResponseData) {
+			assoc_rsp = (tpSirAssocRsp) pe_session->
+					limAssocResponseData;
+			qdf_mem_free(assoc_rsp->sha384_ft_subelem.gtk);
+			qdf_mem_free(assoc_rsp->sha384_ft_subelem.igtk);
 			qdf_mem_free(pe_session->limAssocResponseData);
 			pe_session->limAssocResponseData = NULL;
 		}

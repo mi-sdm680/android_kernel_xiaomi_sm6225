@@ -75,16 +75,6 @@ QDF_STATUS cfg_nan_get_ndp_keepalive_period(struct wlan_objmgr_psoc *psoc,
 					    uint16_t *val);
 
 /**
- * cfg_nan_get_ndp_max_sessions() - get NDP max sessions host supports
- * @psoc: pointer to psoc object
- * @val: pointer to hold max ndp sessions
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS cfg_nan_get_ndp_max_sessions(struct wlan_objmgr_psoc *psoc,
-					uint32_t *val);
-
-/**
  * cfg_nan_get_max_ndi() - get max number of ndi host supports
  * @psoc: pointer to psoc object
  * @val: pointer to hold max number of ndi
@@ -104,10 +94,9 @@ bool cfg_nan_get_support_mp0_discovery(struct wlan_objmgr_psoc *psoc);
 
 /**
  * cfg_nan_is_roam_config_disabled() - get value of nan config roam disable
- * discovery
  * @psoc: pointer to psoc object
  *
- * Return: true on sta roam disable by nan else false
+ * Return: Value of config nan roam disable
  */
 bool cfg_nan_is_roam_config_disabled(struct wlan_objmgr_psoc *psoc);
 #else
@@ -142,13 +131,6 @@ QDF_STATUS cfg_nan_get_ndp_inactivity_timeout(struct wlan_objmgr_psoc *psoc,
 static inline
 QDF_STATUS cfg_nan_get_ndp_keepalive_period(struct wlan_objmgr_psoc *psoc,
 					    uint16_t *val)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline
-QDF_STATUS cfg_nan_get_ndp_max_sessions(struct wlan_objmgr_psoc *psoc,
-					uint32_t *val)
 {
 	return QDF_STATUS_SUCCESS;
 }

@@ -43,38 +43,14 @@ struct hdd_adapter *hdd_wlan_create_ap_dev(struct hdd_context *hdd_ctx,
 enum csr_akm_type
 hdd_translate_rsn_to_csr_auth_type(uint8_t auth_suite[4]);
 
-/**
- * hdd_softap_set_channel_change() -
- * This function to support SAP channel change with CSA IE
- * set in the beacons.
- *
- * @dev: pointer to the net device.
- * @target_chan_freq: target channel frequency.
- * @target_bw: Target bandwidth to move.
- * If no bandwidth is specified, the value is CH_WIDTH_MAX
- * @forced: Force to switch channel, ignore SCC/MCC check
- *
- * Return: 0 for success, non zero for failure
- */
 int hdd_softap_set_channel_change(struct net_device *dev,
-					int target_chan_freq,
+					int target_channel,
 					enum phy_ch_width target_bw,
 					bool forced);
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
-/**
- * hdd_sap_restart_with_channel_switch() - SAP channel change with E/CSA
- * @ap_adapter: HDD adapter
- * @target_chan_freq: Channel frequency to which switch must happen
- * @target_bw: Bandwidth of the target channel
- * @forced: Force to switch channel, ignore SCC/MCC check
- *
- * Invokes the necessary API to perform channel switch for the SAP or GO
- *
- * Return: None
- */
 void hdd_sap_restart_with_channel_switch(struct hdd_adapter *adapter,
-				uint32_t target_chan_freq,
+				uint32_t target_channel,
 				uint32_t target_bw,
 				bool forced);
 /**
@@ -82,7 +58,7 @@ void hdd_sap_restart_with_channel_switch(struct hdd_adapter *adapter,
  * a different channel
  * @psoc: PSOC object information
  * @vdev_id: vdev id
- * @ch_freq: channel to switch
+ * @channel: channel to switch
  * @forced: Force to switch channel, ignore SCC/MCC check
  *
  * This function restarts SAP with a different channel
@@ -91,7 +67,7 @@ void hdd_sap_restart_with_channel_switch(struct hdd_adapter *adapter,
  *
  */
 void hdd_sap_restart_chan_switch_cb(struct wlan_objmgr_psoc *psoc,
-				    uint8_t vdev_id, uint32_t ch_freq,
+				    uint8_t vdev_id, uint32_t channel,
 				    uint32_t channel_bw,
 				    bool forced);
 /**
@@ -99,7 +75,8 @@ void hdd_sap_restart_chan_switch_cb(struct wlan_objmgr_psoc *psoc,
  * suitable channel and restart SAP
  * @psoc: PSOC object information
  * @vdev_id: vdev id
- * @ch_freq: channel to be returned
+ * @channel: channel to be returned
+ * @sec_ch: secondary channel to be returned
  *
  * This function gets the channel parameters to restart SAP
  *
@@ -108,20 +85,8 @@ void hdd_sap_restart_chan_switch_cb(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
 				struct wlan_objmgr_psoc *psoc,
-				uint8_t vdev_id, uint32_t *ch_freq);
-
-/**
- * hdd_get_ap_6ghz_capable() - Get ap vdev 6ghz capable flags
- * @psoc: PSOC object information
- * @vdev_id: vdev id
- *
- * This function gets 6ghz capable information based on hdd ap adapter
- * context.
- *
- * Return: uint32_t, vdev 6g capable flags from enum conn_6ghz_flag
- */
-uint32_t hdd_get_ap_6ghz_capable(struct wlan_objmgr_psoc *psoc,
-				 uint8_t vdev_id);
+				uint8_t vdev_id, uint8_t *channel,
+				uint8_t *sec_ch);
 #endif
 
 /**
@@ -297,11 +262,4 @@ hdd_check_and_disconnect_sta_on_invalid_channel(struct hdd_context *hdd_ctx,
  */
 void hdd_stop_sap_due_to_invalid_channel(struct work_struct *work);
 
-/**
- * hdd_is_any_sta_connecting() - check if any sta is connecting
- * @hdd_ctx: hdd context
- *
- * Return: true if any sta is connecting
- */
-bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx);
 #endif /* end #if !defined(WLAN_HDD_HOSTAPD_H) */

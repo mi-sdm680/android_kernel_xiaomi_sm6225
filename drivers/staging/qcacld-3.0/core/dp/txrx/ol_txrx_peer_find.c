@@ -22,7 +22,7 @@
 #include <qdf_mem.h>         /* qdf_mem_malloc, etc. */
 #include <qdf_types.h>          /* qdf_device_t, qdf_print */
 /* header files for utilities */
-#include "queue.h"         /* TAILQ */
+#include <cds_queue.h>          /* TAILQ */
 
 /* header files for configuration API */
 #include <ol_cfg.h>             /* ol_cfg_max_peer_id */
@@ -865,9 +865,9 @@ void ol_txrx_peer_find_display(ol_txrx_pdev_handle pdev, int indent)
 				      hash_list_elem) {
 				QDF_TRACE(QDF_MODULE_ID_TXRX,
 					  QDF_TRACE_LEVEL_INFO_LOW,
-					  "%*shash idx %d -> %pK ("QDF_MAC_ADDR_FMT")\n",
+					  "%*shash idx %d -> %pK ("QDF_MAC_ADDR_STR")\n",
 					indent + 4, " ", i, peer,
-					QDF_MAC_ADDR_REF(peer->mac_addr.raw));
+					QDF_MAC_ADDR_ARRAY(peer->mac_addr.raw));
 			}
 		}
 	}

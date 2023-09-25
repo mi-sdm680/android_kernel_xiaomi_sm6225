@@ -161,16 +161,6 @@ QDF_STATUS ucfg_get_enable_rts_sifsbursting(struct wlan_objmgr_psoc *psoc,
 					    bool *enable_rts_sifsbursting);
 
 /**
- * ucfg_get_enable_sifs_burst() - Get the enable_sifs_burst value
- * @psoc: pointer to the psoc object
- * @enable_sifs_burst: pointer to return enable_sifs_burst value
- *
- * Return: QDF Status
- */
-QDF_STATUS ucfg_get_enable_sifs_burst(struct wlan_objmgr_psoc *psoc,
-				      uint8_t *enable_sifs_burst);
-
-/**
  * ucfg_get_max_mpdus_inampdu() - Assigns the max_mpdus_inampdu value
  * @psoc: pointer to the psoc object
  *
@@ -267,7 +257,7 @@ QDF_STATUS ucfg_fwol_get_enable_fw_log_type(struct wlan_objmgr_psoc *psoc,
  * @enable_fw_module_log_level:
  * pointer to enable_fw_module_log_level array
  * @enable_fw_module_log_level_num:
- * pointer to enable_fw_module_log_level array element num
+ * pointer to enable_fw_module_log_leve array element num
  *
  * Return: QDF Status
  */
@@ -275,23 +265,6 @@ QDF_STATUS ucfg_fwol_get_enable_fw_module_log_level(
 				struct wlan_objmgr_psoc *psoc,
 				uint8_t **enable_fw_module_log_level,
 				uint8_t *enable_fw_module_log_level_num);
-
-/**
- * ucfg_fwol_wow_get_enable_fw_module_log_level() - Assigns
- * enable_fw_module_log_level string
- *
- * @psoc: pointer to the psoc object
- * @enable_fw_wow_module_log_level:
- * pointer to enable_fw_wow_module_log_level array
- * @enable_fw_wow_module_log_level_num:
- * pointer to enable_fw_wow_module_log_level array element num
- *
- * Return: QDF Status
- */
-QDF_STATUS ucfg_fwol_wow_get_enable_fw_module_log_level(
-				struct wlan_objmgr_psoc *psoc,
-				uint8_t **enable_fw_wow_module_log_level,
-				uint8_t *enable_fw_wow_module_log_level_num);
 
 /**
  * ucfg_fwol_get_sap_xlna_bypass() - Assigns sap_xlna_bypass value
@@ -345,19 +318,6 @@ QDF_STATUS ucfg_fwol_get_tsf_gpio_pin(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_fwol_get_tsf_irq_host_gpio_pin(struct wlan_objmgr_psoc *psoc,
 				    uint32_t *tsf_irq_host_gpio_pin);
-#endif
-
-#ifdef WLAN_FEATURE_TSF_PLUS_EXT_GPIO_SYNC
-/**
- * ucfg_fwol_get_tsf_sync_host_gpio_pin() - Assigns tsf_sync_host_gpio_pin value
- * @psoc: pointer to the psoc object
- *
- * Return: QDF Status
- */
-
-QDF_STATUS
-ucfg_fwol_get_tsf_sync_host_gpio_pin(struct wlan_objmgr_psoc *psoc,
-				     uint32_t *tsf_irq_host_gpio_pin);
 #endif
 
 #ifdef DHCP_SERVER_OFFLOAD

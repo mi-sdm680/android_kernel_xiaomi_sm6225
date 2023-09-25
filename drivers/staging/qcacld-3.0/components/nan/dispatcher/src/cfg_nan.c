@@ -98,21 +98,6 @@ QDF_STATUS cfg_nan_get_ndp_keepalive_period(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS cfg_nan_get_ndp_max_sessions(struct wlan_objmgr_psoc *psoc,
-					uint32_t *val)
-{
-	struct nan_psoc_priv_obj *nan_obj = cfg_nan_get_priv_obj(psoc);
-
-	if (!nan_obj) {
-		nan_err("NAN obj null");
-		*val = cfg_default(CFG_NDP_MAX_SESSIONS);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	*val = nan_obj->cfg_param.max_ndp_sessions;
-	return QDF_STATUS_SUCCESS;
-}
-
 QDF_STATUS cfg_nan_get_max_ndi(struct wlan_objmgr_psoc *psoc, uint32_t *val)
 {
 	struct nan_psoc_priv_obj *nan_obj = cfg_nan_get_priv_obj(psoc);

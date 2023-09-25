@@ -69,14 +69,15 @@ void ucfg_ipa_set_dp_handle(struct wlan_objmgr_psoc *psoc,
 			       void *dp_soc);
 
 /**
- * ucfg_ipa_set_pdev_id() - register pdev id
+ * ucfg_ipa_set_txrx_handle() - register pdev txrx handler
  * @psoc: psoc handle
- * @pdev_id: data path txrx pdev id
+ * @psoc: psoc obj
+ * @txrx_handle: data path pdev txrx handle
  *
  * Return: None
  */
-void ucfg_ipa_set_pdev_id(struct wlan_objmgr_psoc *psoc,
-			  uint8_t pdev_id);
+void ucfg_ipa_set_txrx_handle(struct wlan_objmgr_psoc *psoc,
+			      void *txrx_handle);
 
 /**
  * ucfg_ipa_set_perf_level() - Set IPA perf level
@@ -162,24 +163,6 @@ void ucfg_ipa_reg_sap_xmit_cb(struct wlan_objmgr_pdev *pdev,
  */
 void ucfg_ipa_reg_send_to_nw_cb(struct wlan_objmgr_pdev *pdev,
 				wlan_ipa_send_to_nw cb);
-
-/**
- * ucfg_ipa_reg_rps_enable_cb() - Register cb to enable RPS
- * @pdev: pdev obj
- * @cb: callback
- *
- * Return: None
- */
-#ifdef IPA_LAN_RX_NAPI_SUPPORT
-void ucfg_ipa_reg_rps_enable_cb(struct wlan_objmgr_pdev *pdev,
-				wlan_ipa_rps_enable cb);
-#else
-static inline
-void ucfg_ipa_reg_rps_enable_cb(struct wlan_objmgr_pdev *pdev,
-				wlan_ipa_rps_enable cb)
-{
-}
-#endif
 
 /**
  * ucfg_ipa_set_mcc_mode() - Set MCC mode
@@ -280,6 +263,7 @@ QDF_STATUS ucfg_ipa_send_mcc_scc_msg(struct wlan_objmgr_pdev *pdev,
  * @pdev: pdev obj
  * @net_dev: Interface net device
  * @device_mode: Net interface device mode
+ * @sta_id: station id for the event
  * @session_id: session id for the event
  * @type: event enum of type ipa_wlan_event
  * @mac_address: MAC address associated with the event
@@ -288,7 +272,7 @@ QDF_STATUS ucfg_ipa_send_mcc_scc_msg(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS ucfg_ipa_wlan_evt(struct wlan_objmgr_pdev *pdev,
 			     qdf_netdev_t net_dev, uint8_t device_mode,
-			     uint8_t session_id,
+			     uint8_t sta_id, uint8_t session_id,
 			     enum wlan_ipa_wlan_event ipa_event_type,
 			     uint8_t *mac_addr);
 
@@ -380,14 +364,6 @@ void ucfg_ipa_component_config_update(struct wlan_objmgr_psoc *psoc);
  */
 uint32_t ucfg_ipa_get_tx_buf_count(void);
 
-/**
- * ucfg_ipa_update_tx_stats() - send embedded tx traffic in bytes to IPA
- * @pdev: pdev obj
- * @sta_tx: tx in bytes on sta vdev
- * @ap_tx: tx in bytes on sap vdev
- *
- * Return: void
- */
 void ucfg_ipa_update_tx_stats(struct wlan_objmgr_pdev *pdev, uint64_t sta_tx,
 			      uint64_t ap_tx);
 /**
@@ -428,8 +404,8 @@ QDF_STATUS ucfg_ipa_set_dp_handle(struct wlan_objmgr_psoc *psoc,
 }
 
 static inline
-QDF_STATUS ucfg_ipa_set_pdev_id(struct wlan_objmgr_psoc *psoc,
-				uint8_t pdev_id)
+QDF_STATUS ucfg_ipa_set_txrx_handle(struct wlan_objmgr_psoc *psoc,
+				    void *txrx_handle)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -482,12 +458,6 @@ void ucfg_ipa_reg_sap_xmit_cb(struct wlan_objmgr_pdev *pdev,
 static inline
 void ucfg_ipa_reg_send_to_nw_cb(struct wlan_objmgr_pdev *pdev,
 				wlan_ipa_send_to_nw cb)
-{
-}
-
-static inline
-void ucfg_ipa_reg_rps_enable_cb(struct wlan_objmgr_pdev *pdev,
-				wlan_ipa_rps_enable cb)
 {
 }
 
@@ -556,7 +526,7 @@ QDF_STATUS ucfg_ipa_send_mcc_scc_msg(struct wlan_objmgr_pdev *pdev,
 static inline
 QDF_STATUS ucfg_ipa_wlan_evt(struct wlan_objmgr_pdev *pdev,
 			     qdf_netdev_t net_dev, uint8_t device_mode,
-			     uint8_t session_id,
+			     uint8_t sta_id, uint8_t session_id,
 			     enum wlan_ipa_wlan_event ipa_event_type,
 			     uint8_t *mac_addr)
 {

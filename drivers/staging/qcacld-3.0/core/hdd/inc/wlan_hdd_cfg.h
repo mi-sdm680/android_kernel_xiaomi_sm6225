@@ -47,6 +47,9 @@ struct hdd_context;
 #define FW_MODULE_LOG_LEVEL_STRING_LENGTH  (512)
 #define TX_SCHED_WRR_PARAMS_NUM            (5)
 
+/* Number of items that can be configured */
+#define MAX_CFG_INI_ITEMS   1024
+
 /* Defines for all of the things we read from the configuration (registry). */
 
 #ifdef CONFIG_DP_TRACE
@@ -100,6 +103,9 @@ struct hdd_context;
  */
 
 struct hdd_config {
+	/* Bitmap to track what is explicitly configured */
+	DECLARE_BITMAP(bExplicitCfg, MAX_CFG_INI_ITEMS);
+
 	/* Config parameters */
 	enum hdd_dot11_mode dot11Mode;
 
@@ -137,7 +143,6 @@ struct hdd_config {
 	/* WLAN Logging */
 	bool wlan_logging_enable;
 	bool wlan_logging_to_console;
-	uint8_t host_log_custom_nl_proto;
 #endif /* WLAN_LOGGING_SOCK_SVC_ENABLE */
 
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
@@ -171,16 +176,7 @@ struct hdd_config {
 	uint32_t tcp_delack_timer_count;
 	bool     enable_tcp_param_update;
 	uint32_t bus_low_cnt_threshold;
-	bool enable_latency_crit_clients;
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
-
-#ifdef QCA_SUPPORT_TXRX_DRIVER_TCP_DEL_ACK
-	bool del_ack_enable;
-	uint32_t del_ack_threshold_high;
-	uint32_t del_ack_threshold_low;
-	uint16_t del_ack_timer_value;
-	uint16_t del_ack_pkt_count;
-#endif
 
 #ifdef QCA_LL_LEGACY_TX_FLOW_CONTROL
 	uint32_t tx_flow_low_watermark;
@@ -205,15 +201,12 @@ struct hdd_config {
 	uint8_t dp_trace_config[DP_TRACE_CONFIG_STRING_LENGTH];
 #endif
 	uint8_t enable_nud_tracking;
-	uint32_t operating_chan_freq;
+	uint8_t operating_channel;
 	uint8_t num_vdevs;
 	uint8_t enable_concurrent_sta[CFG_CONCURRENT_IFACE_MAX_LEN];
 	uint8_t dbs_scan_selection[CFG_DBS_SCAN_PARAM_LENGTH];
 #ifdef FEATURE_RUNTIME_PM
 	uint8_t runtime_pm;
-#endif
-#ifdef WLAN_FEATURE_WMI_SEND_RECV_QMI
-	bool is_qmi_stats_enabled;
 #endif
 	uint8_t inform_bss_rssi_raw;
 
@@ -226,13 +219,6 @@ struct hdd_config {
 #ifdef WLAN_FEATURE_TSF_PLUS
 	uint8_t tsf_ptp_options;
 #endif /* WLAN_FEATURE_TSF_PLUS */
-
-#ifdef WLAN_SUPPORT_TXRX_HL_BUNDLE
-	uint32_t pkt_bundle_threshold_high;
-	uint32_t pkt_bundle_threshold_low;
-	uint16_t pkt_bundle_timer_value;
-	uint16_t pkt_bundle_size;
-#endif
 	uint32_t dp_proto_event_bitmap;
 
 #ifdef SAR_SAFETY_FEATURE
@@ -246,7 +232,6 @@ struct hdd_config {
 	bool config_sar_safety_sleep_index;
 #endif
 	bool get_roam_chan_from_fw;
-	uint32_t fisa_enable;
 
 #ifdef WLAN_FEATURE_PERIODIC_STA_STATS
 	/* Periodicity of logging */
@@ -302,36 +287,7 @@ QDF_STATUS hdd_hex_string_to_u16_array(char *str, uint16_t *int_array,
 
 void hdd_cfg_print_global_config(struct hdd_context *hdd_ctx);
 
-QDF_STATUS hdd_update_nss(struct hdd_adapter *adapter, uint8_t tx_nss,
-			  uint8_t rx_nss);
-
-/**
- * hdd_get_tx_nss() - Get the number of spatial streams supported by the
- * adapter
- *
- * @adapter: the pointer to adapter
- * @tx_nss: the number Tx of spatial streams supported by the adapter
- *
- * This function is used to get the number of Tx spatial streams supported by
- * the adapter.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS hdd_get_tx_nss(struct hdd_adapter *adapter, uint8_t *tx_nss);
-
-/**
- * hdd_get_rx_nss() - Get the number of spatial streams supported by the
- * adapter
- *
- * @adapter: the pointer to adapter
- * @rx_nss: the number Rx of spatial streams supported by the adapter
- *
- * This function is used to get the number of Rx spatial streams supported by
- * the adapter.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS hdd_get_rx_nss(struct hdd_adapter *adapter, uint8_t *rx_nss);
+QDF_STATUS hdd_update_nss(struct hdd_adapter *adapter, uint8_t nss);
 
 /**
  * hdd_dfs_indicate_radar() - Block tx as radar found on the channel
@@ -356,6 +312,7 @@ bool hdd_dfs_indicate_radar(struct hdd_context *hdd_ctx);
  * gRuntimePM=0
  * gWlanAutoShutdown = 0
  * gEnableSuspend=0
+ * gEnablePowerSaveOffload=0
  * gEnableWoW=0
  *
  * Return: None

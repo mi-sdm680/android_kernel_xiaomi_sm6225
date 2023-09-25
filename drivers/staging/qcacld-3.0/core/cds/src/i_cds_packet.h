@@ -37,7 +37,7 @@
  * Rx Packet Struct
  * Buffer for the packet received from WMA has pointers to 802.11
  * frame fields and additional information based on the type of frame.
- * @frequency: Frequency
+ * @channel: Channel number
  * @snr: Signal to noise ratio
  * @rssi: Received signal strength indicator, normalized to -96 dBm as
  *        normal noise floor by adding -96 to snr. All the configured
@@ -57,7 +57,7 @@
  * @rssi_raw: rssi based on actual noise floor in hardware.
  */
 typedef struct {
-	uint32_t frequency;
+	uint8_t channel;
 	uint8_t snr;
 	uint32_t rssi;
 	uint32_t timestamp;

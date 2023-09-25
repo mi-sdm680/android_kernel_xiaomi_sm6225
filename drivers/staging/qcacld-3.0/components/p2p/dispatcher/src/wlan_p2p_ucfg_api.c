@@ -433,7 +433,7 @@ QDF_STATUS ucfg_p2p_mgmt_tx_cancel(struct wlan_objmgr_psoc *soc,
 		p2p_debug("invalid id for cookie 0x%llx", cookie);
 		return QDF_STATUS_E_INVAL;
 	}
-	p2p_del_random_mac(soc, wlan_vdev_get_id(vdev), cookie);
+	p2p_del_random_mac(soc, wlan_vdev_get_id(vdev), cookie, 20);
 
 	cancel_tx = qdf_mem_malloc(sizeof(*cancel_tx));
 	if (!cancel_tx) {
@@ -586,8 +586,8 @@ QDF_STATUS ucfg_p2p_register_callbacks(struct wlan_objmgr_psoc *soc,
 	struct p2p_soc_priv_obj *p2p_soc_obj;
 
 	if (!soc || !cb_obj) {
-		p2p_err("psoc: %pK or cb_obj: %pK context passed is NULL",
-			soc, cb_obj);
+		p2p_err("psoc %pM cb_obj %pM context passed is NULL", soc,
+			cb_obj);
 		return QDF_STATUS_E_INVAL;
 	}
 

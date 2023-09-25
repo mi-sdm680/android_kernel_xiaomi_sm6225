@@ -158,6 +158,44 @@ static inline tpDphHashNode get_node(struct mac_context *mac, uint8_t assocId,
 	return &hash_table->pDphNodeArray[assocId];
 }
 
+/* --------------------------------------------------------------------- */
+/**
+ * dph_lookup_assoc_id
+ *
+ * FUNCTION:
+ * This function looks up assocID given the station Id. It traverses the complete table to do this.
+ * Need to find an efficient way to do this.
+ * LOGIC:
+ *
+ * ASSUMPTIONS:
+ *
+ * NOTE:
+ *
+ * @param mac pointer to global Mac structure.
+ * @param staIdx station ID
+ * @param *assocId pointer to associd to be returned by this function.
+ * @return pointer to the dph node.
+ */
+tpDphHashNode dph_lookup_assoc_id(struct mac_context *mac, uint16_t staIdx,
+				  uint16_t *assocId,
+				  struct dph_hash_table *hash_table)
+{
+	uint8_t i;
+
+	for (i = 0; i < hash_table->size; i++) {
+		if ((hash_table->pDphNodeArray[i].added) &&
+		    (hash_table->pDphNodeArray[i].staIndex == staIdx)) {
+			*assocId = i;
+			break;
+		}
+
+	}
+	if (i == hash_table->size)
+		return NULL;
+	return &hash_table->pDphNodeArray[i];
+
+}
+
 /** -------------------------------------------------------------
    \fn dph_init_sta_state
    \brief Initialize STA state. this function saves the staId from the current entry in the DPH table with given assocId
@@ -171,10 +209,11 @@ static inline tpDphHashNode get_node(struct mac_context *mac, uint8_t assocId,
    -------------------------------------------------------------*/
 
 tpDphHashNode dph_init_sta_state(struct mac_context *mac, tSirMacAddr staAddr,
-				 uint16_t assocId,
+				 uint16_t assocId, uint8_t validStaIdx,
 				 struct dph_hash_table *hash_table)
 {
 	tpDphHashNode sta, pnext;
+	uint16_t staIdx = STA_INVALID_IDX;
 
 	if (assocId >= hash_table->size) {
 		pe_err("Invalid Assoc Id %d", assocId);
@@ -182,6 +221,7 @@ tpDphHashNode dph_init_sta_state(struct mac_context *mac, tSirMacAddr staAddr,
 	}
 
 	sta = get_node(mac, (uint8_t) assocId, hash_table);
+	staIdx = sta->staIndex;
 	pnext = sta->next;
 
 	/* Clear the STA node except for the next pointer */
@@ -190,6 +230,10 @@ tpDphHashNode dph_init_sta_state(struct mac_context *mac, tSirMacAddr staAddr,
 
 	/* Initialize the assocId */
 	sta->assocId = assocId;
+	if (true == validStaIdx)
+		sta->staIndex = staIdx;
+	else
+		sta->staIndex = STA_INVALID_IDX;
 
 	/* Initialize STA mac address */
 	qdf_mem_copy(sta->staAddr, staAddr, sizeof(tSirMacAddr));
@@ -228,7 +272,7 @@ tpDphHashNode dph_add_hash_entry(struct mac_context *mac, tSirMacAddr staAddr,
 
 	pe_debug("assocId %d index %d STA addr",
 		       assocId, index);
-	pe_debug(QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(staAddr));
+	pe_debug(QDF_MAC_ADDR_STR, QDF_MAC_ADDR_ARRAY(staAddr));
 
 	if (assocId >= hash_table->size) {
 		pe_err("invalid STA id %d", assocId);
@@ -258,7 +302,7 @@ tpDphHashNode dph_add_hash_entry(struct mac_context *mac, tSirMacAddr staAddr,
 		return NULL;
 	} else {
 		if (dph_init_sta_state
-			    (mac, staAddr, assocId, hash_table) == NULL) {
+			    (mac, staAddr, assocId, false, hash_table) == NULL) {
 			pe_err("could not Init STA id: %d", assocId);
 			return NULL;
 		}
@@ -300,7 +344,7 @@ QDF_STATUS dph_delete_hash_entry(struct mac_context *mac, tSirMacAddr staAddr,
 	uint16_t index = hash_function(mac, staAddr, hash_table->size);
 
 	pe_debug("assocId %d index %d STA addr", assocId, index);
-	pe_debug(QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(staAddr));
+	pe_debug(QDF_MAC_ADDR_STR, QDF_MAC_ADDR_ARRAY(staAddr));
 
 	if (assocId >= hash_table->size) {
 		pe_err("invalid STA id %d", assocId);
@@ -336,7 +380,7 @@ QDF_STATUS dph_delete_hash_entry(struct mac_context *mac, tSirMacAddr staAddr,
 		ptr->next = 0;
 	} else {
 		pe_err("Entry not present STA addr");
-		pe_err(QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(staAddr));
+		pe_err(QDF_MAC_ADDR_STR, QDF_MAC_ADDR_ARRAY(staAddr));
 		return QDF_STATUS_E_FAILURE;
 	}
 

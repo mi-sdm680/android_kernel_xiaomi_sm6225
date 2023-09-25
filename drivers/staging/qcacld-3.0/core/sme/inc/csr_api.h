@@ -196,7 +196,7 @@ typedef enum {
 
 typedef struct tagCsrChannelInfo {
 	uint8_t numOfChannels;
-	uint32_t *freq_list;
+	uint8_t *ChannelList;   /* it will be an array of channels */
 } tCsrChannelInfo, *tpCsrChannelInfo;
 
 typedef enum {
@@ -266,11 +266,62 @@ typedef struct tagCsrEseCckmIe {
 
 typedef struct sCsrChannel_ {
 	uint8_t numChannels;
-	uint32_t channel_freq_list[CFG_VALID_CHANNEL_LIST_LEN];
+	uint8_t channelList[CFG_VALID_CHANNEL_LIST_LEN];
 } sCsrChannel;
 
+typedef struct tagCsrScanResultFilter {
+	tCsrBSSIDs BSSIDs;
+	tCsrSSIDs SSIDs;
+	tCsrChannelInfo ChannelInfo;
+	tCsrAuthList authType;
+	tCsrEncryptionList EncryptionType;
+	/*
+	 * eCSR_ENCRYPT_TYPE_ANY cannot be set in multicast encryption type.
+	 * If caller doesn't case, put all supported encryption types in here
+	 */
+	tCsrEncryptionList mcEncryptionType;
+	eCsrRoamBssType BSSType;
+	/* its a bit mask of all the needed phy mode defined in eCsrPhyMode */
+	eCsrPhyMode phyMode;
+	/*
+	 * If countryCode[0] is not 0, countryCode is checked
+	 * independent of fCheckUnknownCountryCode
+	 */
+	uint8_t countryCode[CFG_COUNTRY_CODE_LEN];
+	uint8_t uapsd_mask;
+	/* For WPS filtering if true => auth and ecryption should be ignored */
+	bool bWPSAssociation;
+	bool bOSENAssociation;
+	/*
+	 * For measurement reports --> if set, only SSID,
+	 * BSSID and channel is considered for filtering.
+	 */
+	bool fMeasurement;
+	struct mobility_domain_info mdid;
+	bool p2pResult;
+#ifdef WLAN_FEATURE_11W
+	/* Management Frame Protection */
+	bool MFPEnabled;
+	uint8_t MFPRequired;
+	uint8_t MFPCapable;
+#endif
+	/* The following flag is used to distinguish the
+	 * roaming case while building the scan filter and
+	 * applying it on to the scan results. This is mainly
+	 * used to support whitelist ssid feature.
+	 */
+	uint8_t scan_filter_for_roam;
+	struct sCsrChannel_ pcl_channels;
+	struct qdf_mac_addr bssid_hint;
+	enum QDF_OPMODE csrPersona;
+	bool realm_check;
+	uint8_t fils_realm[2];
+	bool force_rsne_override;
+	qdf_time_t age_threshold;
+} tCsrScanResultFilter;
+
 typedef struct sCsrChnPower_ {
-	uint32_t first_chan_freq;
+	uint8_t firstChannel;
 	uint8_t numChannels;
 	uint8_t maxtxPower;
 } sCsrChnPower;
@@ -574,9 +625,8 @@ typedef enum {
  * For both 11a and 11g mode.
  */
 #define CSR_CB_CHANNEL_GAP 4
-/* Considering 5 MHz Channel BW */
-#define CSR_CB_CENTER_CHANNEL_OFFSET    10
-#define CSR_SEC_CHANNEL_OFFSET    20
+#define CSR_CB_CENTER_CHANNEL_OFFSET    2
+#define CSR_SEC_CHANNEL_OFFSET    4
 
 
 /* WEP keysize (in bits) */
@@ -633,6 +683,13 @@ typedef enum {
 
 } eCsrRoamWmmUserModeType;
 
+typedef enum {
+	eCSR_REQUESTER_MIN = 0,
+	eCSR_DIAG,
+	eCSR_UMA_GAN,
+	eCSR_HDD
+} eCsrStatsRequesterType;
+
 typedef struct tagPmkidCandidateInfo {
 	struct qdf_mac_addr BSSID;
 	bool preAuthSupported;
@@ -646,6 +703,10 @@ typedef struct tagPmkidCacheInfo {
 	uint8_t ssid_len;
 	uint8_t ssid[WLAN_SSID_MAX_LEN];
 	uint8_t cache_id[CACHE_ID_LEN];
+	struct mobility_domain_info mdid;
+#if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+	bool single_pmk_supported;
+#endif
 } tPmkidCacheInfo;
 
 #ifdef FEATURE_WLAN_WAPI
@@ -712,7 +773,7 @@ struct csr_roam_profile {
 	tAniEdType mgmt_encryption_type;
 	tCsrKeys Keys;
 	tCsrChannelInfo ChannelInfo;
-	uint32_t op_freq;
+	uint8_t operationChannel;
 	struct ch_params ch_params;
 	/* If this is 0, SME will fill in for caller. */
 	uint16_t beaconInterval;
@@ -768,6 +829,7 @@ struct csr_roam_profile {
 	tSirMacRateSet  extended_rates;
 	struct qdf_mac_addr bssid_hint;
 	bool force_24ghz_in_ht20;
+	bool require_h2e;
 	uint32_t cac_duration_ms;
 	uint32_t dfs_regdomain;
 #ifdef WLAN_FEATURE_FILS_SK
@@ -795,7 +857,7 @@ typedef struct tagCsrRoamConnectedProfile {
 	tSirMacSSid SSID;
 	bool handoffPermitted;
 	bool ssidHidden;
-	uint32_t op_freq;
+	uint8_t operationChannel;
 	struct qdf_mac_addr bssid;
 	uint16_t beaconInterval;
 	eCsrRoamBssType BSSType;
@@ -908,8 +970,8 @@ struct csr_config_params {
 	eCsrRoamWmmUserModeType WMMSupportMode;
 	bool Is11eSupportEnabled;
 	bool ProprietaryRatesEnabled;
-	uint32_t ad_hoc_ch_freq_5g;
-	uint32_t ad_hoc_ch_freq_2g;
+	uint8_t AdHocChannel24;
+	uint8_t AdHocChannel5G;
 	/*
 	 * this number minus one is the number of times a scan doesn't find it
 	 * before it is removed
@@ -973,9 +1035,6 @@ struct csr_config_params {
 	uint32_t roam_dense_min_aps;
 	int8_t roam_bg_scan_bad_rssi_thresh;
 	uint8_t roam_bad_rssi_thresh_offset_2g;
-	uint32_t roam_data_rssi_threshold_triggers;
-	int32_t roam_data_rssi_threshold;
-	uint32_t rx_data_inactivity_time;
 	struct csr_sta_roam_policy_params sta_roam_policy_params;
 	bool enable_bcast_probe_rsp;
 	bool is_fils_enabled;
@@ -1053,12 +1112,16 @@ struct csr_roam_info {
 	uint16_t tsmRoamDelay;
 	struct ese_bcn_report_rsp *pEseBcnReportRsp;
 #endif
+	void *pRemainCtx;
+	uint32_t roc_scan_id;
+	uint32_t rxChan;
 #ifdef FEATURE_WLAN_TDLS
 	/*
 	 * TDLS parameters to check whether TDLS
 	 * and TDLS channel switch is allowed in the
 	 * AP network
 	 */
+	uint8_t staType;
 	bool tdls_prohibited;           /* per ExtCap in Assoc/Reassoc resp */
 	bool tdls_chan_swit_prohibited; /* per ExtCap in Assoc/Reassoc resp */
 #endif
@@ -1088,7 +1151,7 @@ struct csr_roam_info {
 	uint8_t subnet_change_status;
 #endif
 	struct oem_channel_info chan_info;
-	uint32_t target_chan_freq;
+	uint8_t target_channel;
 
 #ifdef WLAN_FEATURE_NAN
 	union {
@@ -1102,9 +1165,6 @@ struct csr_roam_info {
 	tDot11fIEhs20vendor_ie hs20vendor_ie;
 	tDot11fIEVHTOperation vht_operation;
 	tDot11fIEHTInfo ht_operation;
-#ifdef WLAN_FEATURE_11AX
-	tDot11fIEhe_op he_operation;
-#endif
 	bool reassoc;
 	bool ampdu;
 	bool sgi_enable;
@@ -1129,7 +1189,6 @@ struct csr_roam_info {
 	int rx_rate;
 	tSirMacCapabilityInfo capability_info;
 	uint32_t rx_mc_bc_cnt;
-	uint32_t rx_retry_cnt;
 #ifdef WLAN_FEATURE_SAE
 	struct sir_sae_info *sae_info;
 #endif
@@ -1267,14 +1326,14 @@ typedef enum {
 
 typedef struct tagCsrHandoffRequest {
 	struct qdf_mac_addr bssid;
-	uint32_t ch_freq;
+	uint8_t channel;
 	uint8_t src;   /* To check if its a REASSOC or a FASTREASSOC IOCTL */
 } tCsrHandoffRequest;
 
 #ifdef FEATURE_WLAN_ESE
 typedef struct tagCsrEseBeaconReqParams {
 	uint16_t measurementToken;
-	uint32_t ch_freq;
+	uint8_t channel;
 	uint8_t scanMode;
 	uint16_t measurementDuration;
 } tCsrEseBeaconReqParams, *tpCsrEseBeaconReqParams;
@@ -1304,8 +1363,7 @@ struct wep_update_default_key_idx {
 	uint8_t default_idx;
 };
 
-typedef QDF_STATUS (*csr_roam_complete_cb)(struct wlan_objmgr_psoc *psoc,
-					   uint8_t session_id,
+typedef QDF_STATUS (*csr_roam_complete_cb)(void *context,
 					   struct csr_roam_info *param,
 					   uint32_t roam_id,
 					   eRoamCmdStatus roam_status,
@@ -1381,6 +1439,9 @@ typedef QDF_STATUS (*csr_session_close_cb)(uint8_t session_id);
 #define CSR_IS_FW_FT_FILS_SUPPORTED(fw_akm_bitmap) \
 	(((fw_akm_bitmap) & (1 << AKM_FT_FILS))  ? true : false)
 
+#define CSR_IS_FW_SUITEB_ROAM_SUPPORTED(fw_akm_bitmap) \
+	(((fw_akm_bitmap) & (1 << AKM_SUITEB))  ? true : false)
+
 QDF_STATUS csr_set_channels(struct mac_context *mac,
 			    struct csr_config_params *pParam);
 
@@ -1388,12 +1449,14 @@ QDF_STATUS csr_set_channels(struct mac_context *mac,
 const char *get_e_roam_cmd_status_str(eRoamCmdStatus val);
 const char *get_e_csr_roam_result_str(eCsrRoamResult val);
 const char *csr_phy_mode_str(eCsrPhyMode phy_mode);
+typedef void (*tCsrStatsCallback)(void *stats, void *pContext);
+typedef void (*tCsrRssiCallback)(int8_t rssi, uint32_t staId, void *pContext);
 
 #ifdef FEATURE_WLAN_ESE
 typedef void (*tCsrTsmStatsCallback)(tAniTrafStrmMetrics tsmMetrics,
-				     void *pContext);
+				     uint32_t staId, void *pContext);
 #endif /* FEATURE_WLAN_ESE */
-typedef void (*tCsrSnrCallback)(int8_t snr, void *pContext);
+typedef void (*tCsrSnrCallback)(int8_t snr, uint32_t staId, void *pContext);
 
 /**
  * csr_roam_issue_ft_preauth_req() - Initiate Preauthentication request
@@ -1427,6 +1490,10 @@ QDF_STATUS csr_continue_lfr2_connect(struct mac_context *mac,
 }
 #endif
 
+#ifdef FEATURE_MONITOR_MODE_SUPPORT
+typedef void (*csr_session_monitor_mode_cb)(uint8_t vdev_id);
+#endif
+
 typedef void (*csr_readyToSuspendCallback)(void *pContext, bool suspended);
 #ifdef WLAN_FEATURE_EXTWOW_SUPPORT
 typedef void (*csr_readyToExtWoWCallback)(void *pContext, bool status);
@@ -1448,8 +1515,6 @@ typedef void (*sme_get_raom_scan_ch_callback)(
 				struct roam_scan_ch_resp *roam_ch,
 				void *context);
 
-#if defined(WLAN_LOGGING_SOCK_SVC_ENABLE) && \
-	defined(FEATURE_PKTLOG) && !defined(REMOVE_PKT_LOG)
 /**
  * csr_packetdump_timer_stop() - stops packet dump timer
  *
@@ -1461,28 +1526,14 @@ typedef void (*sme_get_raom_scan_ch_callback)(
 void csr_packetdump_timer_stop(void);
 
 /**
- * csr_packetdump_timer_start() - start packet dump timer
- *
- * This function is used to start packet dump timer
- *
- * Return: None
- *
- */
-void csr_packetdump_timer_start(void);
-#else
-static inline void csr_packetdump_timer_stop(void) {}
-static inline void csr_packetdump_timer_start(void) {}
-#endif
-
-/**
  * csr_get_channel_status() - get chan info via channel number
  * @mac: Pointer to Global MAC structure
- * @chan_freq: channel frequency
+ * @channel_id: channel id
  *
  * Return: chan status info
  */
 struct lim_channel_status *
-csr_get_channel_status(struct mac_context *mac, uint32_t chan_freq);
+csr_get_channel_status(struct mac_context *mac, uint32_t channel_id);
 
 /**
  * csr_clear_channel_status() - clear chan info
@@ -1514,8 +1565,6 @@ QDF_STATUS
 csr_send_roam_offload_init_msg(struct mac_context *mac, uint32_t vdev_id,
 			       bool enable);
 
-typedef void (*csr_ani_callback)(int8_t *ani, void *context);
-
 #ifdef WLAN_FEATURE_11W
 /**
  * csr_update_pmf_cap_from_connected_profile() - Update pmf cap from profile
@@ -1528,8 +1577,9 @@ void
 csr_update_pmf_cap_from_connected_profile(tCsrRoamConnectedProfile *profile,
 					  struct scan_filter *filter);
 #else
-void
+static inline void
 csr_update_pmf_cap_from_connected_profile(tCsrRoamConnectedProfile *profile,
-					  struct scan_filter *filter);
+					  struct scan_filter *filter)
+{}
 #endif
 #endif

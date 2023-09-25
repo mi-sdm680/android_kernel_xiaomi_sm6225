@@ -210,7 +210,7 @@ QDF_STATUS hdd_restore_thermal_mitigation_config(struct hdd_context *hdd_ctx)
 	dc_off_percent = hdd_ctx->dutycycle_off_percent;
 	dc = thermal_temp.thermal_sampling_time;
 
-	if(!dc_off_percent)
+	if (!dc_off_percent)
 		enable = false;
 
 	hdd_debug("dc %d dc_off_per %d enable %d", dc, dc_off_percent, enable);

@@ -29,9 +29,6 @@
  * @Min: 0 minimum length of tx power
  * @Max: default data length of tx power in string format
  * @Default: 1, 14, 20
- *
- * This ini contains the string in the form of first_channel number,
- * number of channels and max tx power triplets
  */
 #define CFG_MAX_TX_POWER_2_4_DATA "1, 14, 20"
 #define CFG_MAX_TX_POWER_2_4 CFG_STRING( \
@@ -47,9 +44,6 @@
  * @Min: 0 minimum length of tx power
  * @Max: default data length of tx power in string format
  * @Default: 36, 126, 20
- *
- * This ini contains the string in the form of first_channel number,
- * number of channels and max tx power triplets
  */
 #define CFG_MAX_TX_POWER_5_DATA "36, 126, 20"
 #define CFG_MAX_TX_POWER_5 CFG_STRING( \

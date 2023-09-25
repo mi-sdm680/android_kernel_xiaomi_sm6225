@@ -11,6 +11,7 @@ CONFIG_ADRASTEA_RRI_ON_DDR := y
 CONFIG_ATH_PROCFS_DIAG_SUPPORT := y
 CONFIG_ADRASTEA_SHADOW_REGISTERS := y
 CONFIG_HTT_PADDR64 := y
+CONFIG_AR900B := y
 CONFIG_HIF_SNOC:= y
 
 # Genoa specific features
@@ -36,7 +37,10 @@ endif
 ifeq ($(CONFIG_IPA), y)
 CONFIG_IPA_OFFLOAD := y
 endif
-ifeq ($(CONFIG_IPA3), y)
+ifeq ($(CONFIG_IPA3), m)
+CONFIG_IPA3_MODULE := y
+endif
+ifeq (y, $(findstring y, $(CONFIG_IPA3) $(CONFIG_IPA3_MODULE)))
 CONFIG_IPA_OFFLOAD := y
 endif
 

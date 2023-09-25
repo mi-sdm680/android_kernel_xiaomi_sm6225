@@ -155,8 +155,6 @@ const ANI_WDS_INFO_MAX_LENGTH        =  64;
 const SIR_MAC_MAX_NUMBER_OF_RATES    =  12;
 const HT_MAX_SUPPORTED_MCS_SET       =  16;
 const MAX_SUPPORTED_NEIGHBOR_RPT     =  15;
-const MAX_QOS_DSCP_DATA_LEN          =  58;
-const QOS_DSCP_RANGE_LEN             =  16;
 
 /////////////////////////////////////////////////////////////////////////////
 //                  Wi-Fi Protected Setup TLV Identifiers                  //
@@ -2038,14 +2036,6 @@ IE ESERadMgmtCap (EID_VENDOR_SPECIFIC) OUI (0x00, 0x40, 0x96, 0x01)
 
 }
 
-IE BeaconReportStatus (EID_VENDOR_SPECIFIC) OUI (0x00, 0x00, 0x00F, 0x22)
-{
-        sub_type,       1;
-        version,        1;
-        length,         1;
-        reason_code,    1;
-}
-
 IE Vendor1IE (EID_VENDOR_SPECIFIC) OUI (0x00, 0x10, 0x18)
 {
 }
@@ -2408,27 +2398,26 @@ IE VHTCaps (EID_VHT_CAPABILITIES)
         vhtLinkAdaptCap:          2;
         rxAntPattern:             1;
         txAntPattern:             1;
-        extended_nss_bw_supp:     2;
+        reserved1:                2;
     }
     rxMCSMap,                     2;
     {
          rxHighSupDataRate:       13;
-         max_nsts_total:          3;
+         reserved2:               3;
     }
     txMCSMap,                     2;
     {
         txSupDataRate:            13;
-        vht_extended_nss_bw_cap:  1;
-        reserved:                 2;
+        reserved3:                3;
     }
 }
 
 IE VHTOperation (EID_VHT_OPERATION_ELEMENT)
 {
-    chanWidth,             1;
-    chan_center_freq_seg0, 1;
-    chan_center_freq_seg1, 1;
-    basicMCSSet,           2;
+    chanWidth,           1;
+    chanCenterFreqSeg1,  1;
+    chanCenterFreqSeg2,  1;
+    basicMCSSet,         2;
 }
 
 IE VHTExtBssLoad (EID_VHT_EXT_BSS_LOAD)
@@ -2561,8 +2550,7 @@ IE HTInfo (EID_HT_INFO)
         nonGFDevicesPresent: 1;
         transmitBurstLimit: 1;
         obssNonHTStaPresent:1;
-        chan_center_freq_seg2:8;
-        reserved:           3;
+        reserved:           11;
     }
 
 
@@ -2589,17 +2577,16 @@ IE HTInfo (EID_HT_INFO)
 IE OperatingMode (EID_OPERATING_MODE)
 {
     { //Operating Mode field
-        chanWidth:          2;
-        vht_160_80p80_supp: 1;
-        no_ldpc:            1;
-        rxNSS:              3;
-        rxNSSType:          1;
+        chanWidth:    2;
+        reserved:     2;
+        rxNSS:        3;
+        rxNSSType:    1;
     }
 }
 
 IE QosMapSet (EID_QOS_MAP_SET)
 {
-    dscp_exceptions[QOS_DSCP_RANGE_LEN..MAX_QOS_DSCP_DATA_LEN];
+    dscp_exceptions[0..60];
 }
 
 CONTAINERIE RICDataDesc
@@ -3001,8 +2988,7 @@ IE he_op (EID_EXTN_ID_ELEMENT) OUI (0x24)
     }
     {
         er_su_disable: 1;
-	oper_info_6g_present: 1;
-        reserved2: 6;
+        reserved2: 7;
     }
     {
         bss_color:6;
@@ -3026,35 +3012,6 @@ IE he_op (EID_EXTN_ID_ELEMENT) OUI (0x24)
             data, 1;
         }
     };
-    OPTIONAL UNION oper_info_6g (DISCRIMINATOR oper_info_6g_present)
-    {
-        info (oper_info_6g_present IS 1)
-        {
-            primary_ch, 1;
-            { // control
-                ch_width: 2;
-                dup_bcon: 1;
-                reserved: 5;
-            }
-            center_freq_seg0, 1;
-            center_freq_seg1, 1;
-            min_rate, 1;
-        }
-    };
-}
-
-IE he_6ghz_band_cap (EID_EXTN_ID_ELEMENT) OUI (0x3B)
-{
-    { // capabilities_information
-        min_mpdu_start_spacing :3;
-        max_ampdu_len_exp: 3;
-        max_mpdu_len: 3;
-        sm_pow_save: 2;
-        rd_responder: 1;
-        rx_ant_pattern_consistency: 1;
-        tx_ant_pattern_consistency: 1;
-        reserved: 2;
-    }
 }
 
 IE mu_edca_param_set (EID_EXTN_ID_ELEMENT) OUI (0x26)
@@ -3523,7 +3480,6 @@ FRAME Beacon                              // C.f. Sec. 7.2.3.1
     OPTIE  qcn_ie;
     OPTIE  he_cap;
     OPTIE  he_op;
-    OPTIE  he_6ghz_band_cap;
     OPTIE  bss_color_change;
     OPTIE  mu_edca_param_set;
     OPTIE  esp_information;
@@ -3620,7 +3576,6 @@ FRAME Beacon2
     OPTIE  qcn_ie;
     OPTIE  he_cap;
     OPTIE  he_op;
-    OPTIE  he_6ghz_band_cap;
     OPTIE  bss_color_change;
     OPTIE  mu_edca_param_set;
     OPTIE  esp_information;
@@ -3693,7 +3648,6 @@ FRAME BeaconIEs
     OPTIE  qcn_ie;
     OPTIE  he_cap;
     OPTIE  he_op;
-    OPTIE  he_6ghz_band_cap;
     OPTIE  bss_color_change;
     OPTIE  mu_edca_param_set;
     OPTIE  esp_information;
@@ -3745,7 +3699,6 @@ FRAME AssocRequest                        // 7.2.3.4
     OPTIE  hs20vendor_ie;
     OPTIE  qcn_ie;
     OPTIE  he_cap;
-    OPTIE  he_6ghz_band_cap;
     OPTIE  osen_ie;
     OPTIE roaming_consortium_sel;
 } // End frame AssocRequest.
@@ -3791,7 +3744,6 @@ FRAME AssocResponse                       // 7.2.3.5
     OPTIE  qcn_ie;
     OPTIE  he_cap;
     OPTIE  he_op;
-    OPTIE  he_6ghz_band_cap;
     OPTIE  bss_color_change;
     OPTIE  mu_edca_param_set;
     OPTIE  MBO_IE;
@@ -3813,7 +3765,6 @@ FRAME ReAssocRequest                      // 7.2.3.6
     OPTIE  MobilityDomain;
     OPTIE  FTInfo;
     OPTIE  RICDataDesc[2];
-    OPTIE  SuppOperatingClasses;
     OPTIE  WPAOpaque;
     OPTIE  HTCaps;
     OPTIE  WMMCaps;
@@ -3835,7 +3786,6 @@ FRAME ReAssocRequest                      // 7.2.3.6
     OPTIE  vendor_vht_ie;
     OPTIE  hs20vendor_ie;
     OPTIE  he_cap;
-    OPTIE  he_6ghz_band_cap;
 } // End frame ReAssocRequest.
 
 FRAME ReAssocResponse                     // 7.2.3.7
@@ -3873,7 +3823,6 @@ FRAME ReAssocResponse                     // 7.2.3.7
     OPTIE  vendor_vht_ie;
     OPTIE  he_cap;
     OPTIE  he_op;
-    OPTIE  he_6ghz_band_cap;
     OPTIE  bss_color_change;
     OPTIE  mu_edca_param_set;
     OPTIE  MBO_IE;
@@ -3894,7 +3843,6 @@ FRAME ProbeRequest                        // 7.2.3.8
     OPTIE  ExtCap;
     OPTIE  qcn_ie;
     OPTIE  he_cap;
-    OPTIE  he_6ghz_band_cap;
 } // End frame ProbeRequest.
 
 FRAME ProbeResponse                       // 7.2.3.9
@@ -3957,7 +3905,6 @@ FRAME ProbeResponse                       // 7.2.3.9
     OPTIE  qcn_ie;
     OPTIE  he_cap;
     OPTIE  he_op;
-    OPTIE  he_6ghz_band_cap;
     OPTIE  bss_color_change;
     OPTIE  mu_edca_param_set;
     OPTIE  esp_information;
@@ -4124,7 +4071,7 @@ FRAME RadioMeasurementRequest
    FF    DialogToken;
    FF    NumOfRepetitions;
    //Measurement Request IE.
-   MANDIE MeasurementRequest[1..5];
+   MANDIE MeasurementRequest[1..2];
 }
 
 FRAME RadioMeasurementReport
@@ -4134,7 +4081,6 @@ FRAME RadioMeasurementReport
    FF   DialogToken;
    //Measurement Report elements.
    MANDIE MeasurementReport[1..4];
-   OPTIE  BeaconReportStatus;
 }
 
 FRAME LinkMeasurementRequest

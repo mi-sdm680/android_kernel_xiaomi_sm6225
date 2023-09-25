@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -51,6 +51,7 @@
 #include "wlan_p2p_cfg_api.h"
 #include "wlan_policy_mgr_ucfg.h"
 #include "nan_ucfg_api.h"
+#include "wlan_pkt_capture_ucfg_api.h"
 
 /* Ms to Time Unit Micro Sec */
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
@@ -643,11 +644,6 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 		return ERR_PTR(-EINVAL);
 	}
 
-	if (cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE) {
-		hdd_err("Concurrency not allowed with standalone monitor mode");
-		return ERR_PTR(-EINVAL);
-	}
-
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
 		return ERR_PTR(ret);
@@ -685,13 +681,17 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	}
 
 	adapter = NULL;
-	ret = wlan_hdd_add_monitor_check(hdd_ctx, &adapter, type, name,
-					 true, name_assign_type);
-	if (ret)
-		return ERR_PTR(-EINVAL);
-	if (adapter) {
-		hdd_exit();
-		return adapter->dev->ieee80211_ptr;
+	if ((ucfg_pkt_capture_get_mode(hdd_ctx->psoc)) &&
+	    (type == NL80211_IFTYPE_MONITOR)) {
+		ret = wlan_hdd_add_monitor_check(hdd_ctx, &adapter, name,
+						 true, name_assign_type);
+		if (ret)
+			return ERR_PTR(-EINVAL);
+
+		if (adapter) {
+			hdd_exit();
+			return adapter->dev->ieee80211_ptr;
+		}
 	}
 
 	adapter = NULL;
@@ -709,25 +709,16 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 					   p2p_device_address.bytes,
 					   name_assign_type, true);
 	} else {
-		uint8_t *device_address;
-
-		device_address = wlan_hdd_get_intf_addr(hdd_ctx, mode);
-		if (!device_address)
-			return ERR_PTR(-EINVAL);
-
 		adapter = hdd_open_adapter(hdd_ctx, mode, name,
-					   device_address,
+					   wlan_hdd_get_intf_addr(hdd_ctx,
+								  mode),
 					   name_assign_type, true);
-		if (!adapter)
-			wlan_hdd_release_intf_addr(hdd_ctx, device_address);
 	}
 
 	if (!adapter) {
 		hdd_err("hdd_open_adapter failed");
 		return ERR_PTR(-ENOSPC);
 	}
-
-	adapter->delete_in_progress = false;
 
 	/* ensure physcial soc is up */
 	ret = hdd_trigger_psoc_idle_restart(hdd_ctx);
@@ -858,7 +849,6 @@ int __wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 	} else if (wlan_hdd_is_session_type_monitor(
 					adapter->device_mode)) {
 		wlan_hdd_del_monitor(hdd_ctx, adapter, TRUE);
-		hdd_reset_pktcapture_cb(OL_TXRX_PDEV_ID);
 	} else {
 		wlan_hdd_release_intf_addr(hdd_ctx,
 					   adapter->mac_addr.bytes);
@@ -876,9 +866,7 @@ int wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(wdev->netdev);
 
-	adapter->delete_in_progress = true;
 	errno = osif_vdev_sync_trans_start_wait(wdev->netdev, &vdev_sync);
 	if (errno)
 		return errno;
@@ -956,17 +944,18 @@ wlan_hdd_cfg80211_convert_rxmgmt_flags(enum rxmgmt_flags flag,
 static void
 __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 				  uint32_t frm_len, uint8_t *pb_frames,
-				  uint8_t frame_type, uint32_t rx_freq,
+				  uint8_t frame_type, uint32_t rx_chan,
 				  int8_t rx_rssi, enum rxmgmt_flags rx_flags)
 {
+	uint16_t freq;
 	uint8_t type = 0;
 	uint8_t sub_type = 0;
 	struct hdd_context *hdd_ctx;
 	uint8_t *dest_addr;
 	enum nl80211_rxmgmt_flags nl80211_flag = 0;
 
-	hdd_debug("Frame Type = %d Frame Length = %d freq = %d",
-		  frame_type, frm_len, rx_freq);
+	hdd_debug("Frame Type = %d Frame Length = %d",
+		  frame_type, frm_len);
 
 	if (!adapter) {
 		hdd_err("adapter is NULL");
@@ -1004,7 +993,7 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 			 * we are dropping action frame
 			 */
 			hdd_err("adapter for action frame is NULL Macaddr = "
-				QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(dest_addr));
+				QDF_MAC_ADDR_STR, QDF_MAC_ADDR_ARRAY(dest_addr));
 			hdd_debug("Frame Type = %d Frame Length = %d subType = %d",
 				  frame_type, frm_len, sub_type);
 			/*
@@ -1037,6 +1026,12 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 
 	/* Channel indicated may be wrong. TODO */
 	/* Indicate an action frame. */
+	if (rx_chan <= MAX_NO_OF_2_4_CHANNELS)
+		freq = ieee80211_channel_to_frequency(rx_chan,
+						      NL80211_BAND_2GHZ);
+	else
+		freq = ieee80211_channel_to_frequency(rx_chan,
+						      NL80211_BAND_5GHZ);
 
 	if (hdd_is_qos_action_frame(pb_frames, frm_len))
 		sme_update_dsc_pto_up_mapping(hdd_ctx->mac_handle,
@@ -1051,23 +1046,23 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
 	cfg80211_rx_mgmt(adapter->dev->ieee80211_ptr,
-			 rx_freq, rx_rssi * 100, pb_frames,
+		 freq, rx_rssi * 100, pb_frames,
 			 frm_len, NL80211_RXMGMT_FLAG_ANSWERED | nl80211_flag);
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 12, 0))
 	cfg80211_rx_mgmt(adapter->dev->ieee80211_ptr,
-			 rx_freq, rx_rssi * 100, pb_frames,
+			freq, rx_rssi * 100, pb_frames,
 			 frm_len, NL80211_RXMGMT_FLAG_ANSWERED,
 			 GFP_ATOMIC);
 #else
-	cfg80211_rx_mgmt(adapter->dev->ieee80211_ptr, rx_freq,
-			 rx_rssi * 100,
-			 pb_frames, frm_len, GFP_ATOMIC);
+	cfg80211_rx_mgmt(adapter->dev->ieee80211_ptr, freq,
+			rx_rssi * 100,
+			pb_frames, frm_len, GFP_ATOMIC);
 #endif /* LINUX_VERSION_CODE */
 }
 
 void hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 				     uint32_t frm_len, uint8_t *pb_frames,
-				     uint8_t frame_type, uint32_t rx_freq,
+				     uint8_t frame_type, uint32_t rx_chan,
 				     int8_t rx_rssi, enum rxmgmt_flags rx_flags)
 {
 	int errno;
@@ -1078,7 +1073,7 @@ void hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 		return;
 
 	__hdd_indicate_mgmt_frame_to_user(adapter, frm_len, pb_frames,
-					  frame_type, rx_freq,
+					  frame_type, rx_chan,
 					  rx_rssi, rx_flags);
 	osif_vdev_sync_op_stop(vdev_sync);
 }
@@ -1221,18 +1216,16 @@ static uint32_t set_first_connection_operating_channel(
 		enum QDF_OPMODE dev_mode)
 {
 	uint8_t operating_channel;
-	uint32_t oper_chan_freq;
 
-	oper_chan_freq = hdd_get_operating_chan_freq(hdd_ctx, dev_mode);
-	if (!oper_chan_freq) {
+	operating_channel = hdd_get_operating_channel(
+					hdd_ctx, dev_mode);
+	if (!operating_channel) {
 		hdd_err(" First adpter operating channel is invalid");
 		return -EINVAL;
 	}
-	operating_channel = wlan_reg_freq_to_chan(hdd_ctx->pdev,
-						  oper_chan_freq);
 
 	hdd_info("First connection channel No.:%d and quota:%dms",
-		 operating_channel, set_value);
+			operating_channel, set_value);
 	/* Move the time quota for first channel to bits 15-8 */
 	set_value = set_value << 8;
 
@@ -1262,9 +1255,8 @@ static uint32_t set_second_connection_operating_channel(
 {
 	uint8_t operating_channel;
 
-	operating_channel = wlan_freq_to_chan(
-				policy_mgr_get_mcc_operating_channel(
-				hdd_ctx->psoc, vdev_id));
+	operating_channel = policy_mgr_get_mcc_operating_channel(
+		hdd_ctx->psoc, vdev_id);
 
 	if (operating_channel == 0) {
 		hdd_err("Second adapter operating channel is invalid");

@@ -127,83 +127,6 @@
 
 /*
  * <ini>
- * acs_policy - External ACS policy control
- * @Min: 0
- * @Max: 1
- * @Default: 1
- *
- * Values are per enum hdd_external_acs_policy.
- *
- * This ini is used to control the external ACS policy.
- *
- * 0 -Preferable for ACS to select a
- *    channel with non-zero pcl weight.
- * 1 -Mandatory for ACS to select a
- *    channel with non-zero pcl weight.
- *
- * Related: None
- *
- * Supported Feature: ACS
- *
- * Usage: Internal/External
- *
- * </ini>
- */
-
-#define CFG_EXTERNAL_ACS_POLICY CFG_INI_BOOL( \
-		"acs_policy", \
-		1, \
-		"External ACS Policy Control")
-
-#define ACS_WEIGHT_MAX_STR_LEN            500
-
-/*
- * <ini>
- * normalize_acs_weight - Used to control the ACS channel weightage.
- *
- * This ini is used to specify the weight percentage of the channel. Channel
- * weights can be controlled by user to prioritize or de-prioritize channels.
- *
- * Related: ACS
- *
- * Supported Feature: ACS
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_NORMALIZE_ACS_WEIGHT CFG_INI_STRING( \
-		"normalize_acs_weight", \
-		0, \
-		ACS_WEIGHT_MAX_STR_LEN, \
-		"5940-7105=0, 5965=100, 6045=100, 6125=100, 6205=100, 6285=100, 6365=100, 6605=100, 6685=100, 6765=100, 6845=100", \
-		"Used to specify the channel weights")
-
-/*
- * <ini>
- * force_start_sap- Enable the SAP even if no channel is suitable for SAP
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini is used to enable the SAP even if no channel is found suitable
- * for SAP by ACS.
- *
- * Related: NA
- *
- * Supported Feature: ACS
- *
- * Usage: Internal
- *
- * </ini>
- */
-#define CFG_ACS_FORCE_START_SAP CFG_INI_BOOL( \
-		"force_start_sap", \
-		0, \
-		"Force start SAP")
-
-/*
- * <ini>
  * np_chan_weight - chan weightage for non preferred channels
  * @Min: 0x00000000
  * @Max: 0x64646464
@@ -240,14 +163,66 @@
 		CFG_VALUE_OR_DEFAULT, \
 		"np chan weight")
 
+/*
+ * <ini>
+ * acs_policy - External ACS policy control
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * Values are per enum hdd_external_acs_policy.
+ *
+ * This ini is used to control the external ACS policy.
+ *
+ * 0 -Preferable for ACS to select a
+ *    channel with non-zero pcl weight.
+ * 1 -Mandatory for ACS to select a
+ *    channel with non-zero pcl weight.
+ *
+ * Related: None
+ *
+ * Supported Feature: ACS
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+
+#define CFG_EXTERNAL_ACS_POLICY CFG_INI_BOOL( \
+		"acs_policy", \
+		1, \
+		"External ACS Policy Control")
+
+/*
+ * <ini>
+ * force_start_sap- Enable the SAP even if no channel is suitable for SAP
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable the SAP even if no channel is found suitable
+ * for SAP by ACS.
+ *
+ * Related: NA
+ *
+ * Supported Feature: ACS
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_ACS_FORCE_START_SAP CFG_INI_BOOL( \
+		"force_start_sap", \
+		0, \
+		"Force start SAP")
+
 #define CFG_ACS_ALL \
 	CFG(CFG_ACS_WITH_MORE_PARAM) \
 	CFG(CFG_AUTO_CHANNEL_SELECT_WEIGHT) \
+	CFG(CFG_ACS_NP_CHAN_WEIGHT) \
 	CFG(CFG_USER_AUTO_CHANNEL_SELECTION) \
 	CFG(CFG_USER_ACS_DFS_LTE) \
 	CFG(CFG_EXTERNAL_ACS_POLICY) \
-	CFG(CFG_NORMALIZE_ACS_WEIGHT) \
-	CFG(CFG_ACS_FORCE_START_SAP) \
-	CFG(CFG_ACS_NP_CHAN_WEIGHT)
+	CFG(CFG_ACS_FORCE_START_SAP)
 
 #endif /* __CFG_MLME_ACS_H */

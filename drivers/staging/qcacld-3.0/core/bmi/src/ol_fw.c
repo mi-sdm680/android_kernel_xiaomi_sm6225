@@ -545,19 +545,13 @@ struct ramdump_info {
 
 /**
  * if have platform driver support, reinit will be called by CNSS.
- * recovery flag will be cleaned and CRASHED indication will be sent
- * to user space by reinit function. If not support, clean recovery
- * flag and send CRASHED indication in CLD driver.
+ * recovery flag will be cleaned by reinit function. If not support,
+ * clean recovery flag in CLD driver.
  */
-static inline void ol_check_clean_recovery_flag(struct ol_context *ol_ctx)
+static inline void ol_check_clean_recovery_flag(struct device *dev)
 {
-	qdf_device_t qdf_dev = ol_ctx->qdf_dev;
-
-	if (!pld_have_platform_driver_support(qdf_dev->dev)) {
+	if (!pld_have_platform_driver_support(dev))
 		cds_set_recovery_in_progress(false);
-		if (ol_ctx->fw_crashed_cb)
-			ol_ctx->fw_crashed_cb();
-	}
 }
 
 #if !defined(QCA_WIFI_3_0)
@@ -614,7 +608,7 @@ int ol_copy_ramdump(struct hif_opaque_softc *scn)
 	return ret;
 }
 
-static void __ramdump_work_handler(void *data)
+void ramdump_work_handler(void *data)
 {
 	int ret;
 	uint32_t host_interest_address;
@@ -651,7 +645,7 @@ static void __ramdump_work_handler(void *data)
 		BMI_ERR("HifDiagReadiMem FW Dump Area Pointer failed!");
 		ol_copy_ramdump(ramdump_scn);
 		pld_device_crashed(qdf_dev->dev);
-		ol_check_clean_recovery_flag(ol_ctx);
+		ol_check_clean_recovery_flag(qdf_dev->dev);
 
 		return;
 	}
@@ -678,10 +672,10 @@ static void __ramdump_work_handler(void *data)
 	 */
 	if (cds_is_load_or_unload_in_progress())
 		cds_set_recovery_in_progress(false);
-	else {
+	else
 		pld_device_crashed(qdf_dev->dev);
-		ol_check_clean_recovery_flag(ol_ctx);
-	}
+
+	ol_check_clean_recovery_flag(qdf_dev->dev);
 	return;
 
 out_fail:
@@ -692,19 +686,7 @@ out_fail:
 	else
 		pld_device_crashed(qdf_dev->dev);
 
-	ol_check_clean_recovery_flag(ol_ctx);
-}
-
-void ramdump_work_handler(void *data)
-{
-	struct qdf_op_sync *op_sync;
-
-	if (qdf_op_protect(&op_sync))
-		return;
-
-	__ramdump_work_handler(data);
-
-	qdf_op_unprotect(op_sync);
+	ol_check_clean_recovery_flag(qdf_dev->dev);
 }
 
 void fw_indication_work_handler(void *data)
@@ -714,8 +696,6 @@ void fw_indication_work_handler(void *data)
 
 	pld_device_self_recovery(qdf_dev->dev,
 				 PLD_REASON_DEFAULT);
-
-	ol_check_clean_recovery_flag(ol_ctx);
 }
 
 void ol_target_failure(void *instance, QDF_STATUS status)
@@ -1939,10 +1919,4 @@ void ol_init_ini_config(struct ol_context *ol_ctx,
 			struct ol_config_info *cfg)
 {
 	qdf_mem_copy(&ol_ctx->cfg_info, cfg, sizeof(struct ol_config_info));
-}
-
-void ol_set_fw_crashed_cb(struct ol_context *ol_ctx,
-			  void (*callback_fn)(void))
-{
-	ol_ctx->fw_crashed_cb = callback_fn;
 }

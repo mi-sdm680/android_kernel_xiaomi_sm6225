@@ -164,13 +164,13 @@ QDF_STATUS ipa_send_uc_offload_enable_disable(struct wlan_objmgr_pdev *pdev,
 void ipa_set_dp_handle(struct wlan_objmgr_psoc *psoc, void *dp_soc);
 
 /**
- * ipa_set_pdev_id() - set dp pdev id
+ * ipa_set_txrx_handle() - set dp txrx handle
  * @psoc: psoc handle
- * @pdev_id: dp txrx physical device id
+ * @txrx_handle: dp txrx handle
  *
  * Return: None
  */
-void ipa_set_pdev_id(struct wlan_objmgr_psoc *psoc, uint8_t pdev_id);
+void ipa_set_txrx_handle(struct wlan_objmgr_psoc *psoc, void *txrx_handle);
 
 /**
  * ipa_rm_set_perf_level() - set ipa rm perf level
@@ -255,18 +255,6 @@ void ipa_reg_sap_xmit_cb(struct wlan_objmgr_pdev *pdev,
  */
 void ipa_reg_send_to_nw_cb(struct wlan_objmgr_pdev *pdev,
 			   wlan_ipa_send_to_nw cb);
-
-#ifdef IPA_LAN_RX_NAPI_SUPPORT
-/**
- * ipa_reg_rps_enable_cb() - Register cb to enable RPS
- * @pdev: pdev obj
- * @cb: callback
- *
- * Return: None
- */
-void ipa_reg_rps_enable_cb(struct wlan_objmgr_pdev *pdev,
-			   wlan_ipa_rps_enable cb);
-#endif
 
 /**
  * ipa_set_mcc_mode() - Set MCC mode
@@ -368,6 +356,7 @@ QDF_STATUS ipa_send_mcc_scc_msg(struct wlan_objmgr_pdev *pdev,
  * @pdev: pdev obj
  * @net_dev: Interface net device
  * @device_mode: Net interface device mode
+ * @sta_id: station id for the event
  * @session_id: session id for the event
  * @type: event enum of type ipa_wlan_event
  * @mac_address: MAC address associated with the event
@@ -375,7 +364,7 @@ QDF_STATUS ipa_send_mcc_scc_msg(struct wlan_objmgr_pdev *pdev,
  * Return: QDF_STATUS
  */
 QDF_STATUS ipa_wlan_evt(struct wlan_objmgr_pdev *pdev, qdf_netdev_t net_dev,
-			uint8_t device_mode, uint8_t session_id,
+			uint8_t device_mode, uint8_t sta_id, uint8_t session_id,
 			enum wlan_ipa_wlan_event ipa_event_type,
 			uint8_t *mac_addr);
 
@@ -487,7 +476,6 @@ void ipa_flush_pending_vdev_events(struct wlan_objmgr_pdev *pdev,
 #else /* Not IPA_OFFLOAD */
 typedef QDF_STATUS (*wlan_ipa_softap_xmit)(qdf_nbuf_t nbuf, qdf_netdev_t dev);
 typedef void (*wlan_ipa_send_to_nw)(qdf_nbuf_t nbuf, qdf_netdev_t dev);
-typedef void (*wlan_ipa_rps_enable)(uint8_t vdev_id, bool enable);
 
 #endif /* IPA_OFFLOAD */
 #endif /* end  of _WLAN_IPA_MAIN_H_ */

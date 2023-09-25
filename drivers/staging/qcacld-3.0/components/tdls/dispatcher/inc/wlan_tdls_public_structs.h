@@ -86,7 +86,11 @@
 #define TDLS_TEARDOWN_PEER_UNREACHABLE   25
 #define TDLS_TEARDOWN_PEER_UNSPEC_REASON 26
 
+#define INVALID_TDLS_PEER_ID 0xFF
 #define INVALID_TDLS_PEER_INDEX 0xFF
+
+#define TDLS_STA_INDEX_CHECK(sta_id) \
+	(((sta_id) >= 0) && ((sta_id) < 0xFF))
 
 /**
  * enum tdls_add_oper - add peer type
@@ -397,11 +401,6 @@ struct tx_frame {
 	qdf_timer_t tx_timer;
 };
 
-enum tdls_configured_external_control {
-	TDLS_STRICT_EXTERNAL_CONTROL = 1,
-	TDLS_LIBERAL_EXTERNAL_CONTROL = 2,
-};
-
 /**
  * enum tdls_feature_bit
  * @TDLS_FEATURE_OFF_CHANNEL: tdls off channel
@@ -411,8 +410,7 @@ enum tdls_configured_external_control {
  * @TDLS_FEATURE_SCAN: tdls scan
  * @TDLS_FEATURE_ENABLE: tdls enabled
  * @TDLS_FEAUTRE_IMPLICIT_TRIGGER: tdls implicit trigger
- * @TDLS_FEATURE_EXTERNAL_CONTROL: enforce strict tdls external control
- * @TDLS_FEATURE_LIBERAL_EXTERNAL_CONTROL: liberal external tdls control
+ * @TDLS_FEATURE_EXTERNAL_CONTROL: tdls external control
  */
 enum tdls_feature_bit {
 	TDLS_FEATURE_OFF_CHANNEL,
@@ -422,8 +420,7 @@ enum tdls_feature_bit {
 	TDLS_FEATURE_SCAN,
 	TDLS_FEATURE_ENABLE,
 	TDLS_FEAUTRE_IMPLICIT_TRIGGER,
-	TDLS_FEATURE_EXTERNAL_CONTROL,
-	TDLS_FEATURE_LIBERAL_EXTERNAL_CONTROL,
+	TDLS_FEATURE_EXTERNAL_CONTROL
 };
 
 #define TDLS_IS_OFF_CHANNEL_ENABLED(flags) \
@@ -442,8 +439,6 @@ enum tdls_feature_bit {
 	CHECK_BIT(flags, TDLS_FEAUTRE_IMPLICIT_TRIGGER)
 #define TDLS_IS_EXTERNAL_CONTROL_ENABLED(flags) \
 	CHECK_BIT(flags, TDLS_FEATURE_EXTERNAL_CONTROL)
-#define TDLS_IS_LIBERAL_EXTERNAL_CONTROL_ENABLED(flags) \
-	CHECK_BIT(flags, TDLS_FEATURE_LIBERAL_EXTERNAL_CONTROL)
 
 /**
  * struct tdls_user_config - TDLS user configuration
@@ -504,7 +499,7 @@ struct tdls_user_config {
 	bool tdls_off_chan_enable;
 	bool tdls_off_chan_enable_orig;
 	bool tdls_wmm_mode_enable;
-	uint8_t tdls_external_control;
+	bool tdls_external_control;
 	bool tdls_implicit_trigger_enable;
 	bool tdls_scan_enable;
 	bool tdls_sleep_sta_enable;
@@ -554,7 +549,7 @@ struct tdls_tx_cnf {
 /**
  * struct tdls_rx_mgmt_frame - rx mgmt frame structure
  * @frame_len: frame length
- * @rx_freq: rx freq
+ * @rx_chan: rx channel
  * @vdev_id: vdev id
  * @frm_type: frame type
  * @rx_rssi: rx rssi
@@ -562,7 +557,7 @@ struct tdls_tx_cnf {
  */
 struct tdls_rx_mgmt_frame {
 	uint32_t frame_len;
-	uint32_t rx_freq;
+	uint32_t rx_chan;
 	uint32_t vdev_id;
 	uint32_t frm_type;
 	uint32_t rx_rssi;
@@ -608,18 +603,18 @@ typedef void (*tdls_evt_callback) (void *data,
 typedef QDF_STATUS (*tdls_register_peer_callback)(void *userdata,
 						  uint32_t vdev_id,
 						  const uint8_t *mac,
+						  uint16_t stat_id,
 						  uint8_t qos);
 
 /* This callback is used to deregister TDLS peer from the datapath */
-typedef QDF_STATUS
-(*tdls_deregister_peer_callback)(void *userdata,
-				 uint32_t vdev_id,
-				 struct qdf_mac_addr *peer_mac);
+typedef QDF_STATUS (*tdls_deregister_peer_callback)(void *userdata,
+						    uint32_t vdev_id,
+						    uint8_t sta_id);
 
 /* This callback is used to update datapath vdev flags */
 typedef QDF_STATUS
 (*tdls_dp_vdev_update_flags_callback)(void *cbk_data,
-				      uint8_t vdev_id,
+				      uint8_t sta_id,
 				      uint32_t vdev_param,
 				      bool is_link_up);
 
@@ -659,6 +654,7 @@ typedef void (*tdls_vdev_deinit_cb)(struct wlan_objmgr_vdev *vdev);
  * @tdls_evt_cb_data: tdls event data
  * @tdls_peer_context: userdata for register/deregister TDLS peer
  * @tdls_reg_peer: register tdls peer with datapath
+ * @tdls_dereg_peer: deregister tdls peer from datapath
  * @tdls_dp_vdev_update: update vdev flags in datapath
  * @tdls_osif_init_cb: callback to initialize the tdls priv
  * @tdls_osif_deinit_cb: callback to deinitialize the tdls priv
@@ -679,6 +675,7 @@ struct tdls_start_params {
 	void *tdls_evt_cb_data;
 	void *tdls_peer_context;
 	tdls_register_peer_callback tdls_reg_peer;
+	tdls_deregister_peer_callback tdls_dereg_peer;
 	tdls_dp_vdev_update_flags_callback tdls_dp_vdev_update;
 	tdls_vdev_init_cb tdls_osif_init_cb;
 	tdls_vdev_deinit_cb tdls_osif_deinit_cb;
@@ -887,10 +884,9 @@ struct tdls_ch_params {
  * @peer_chan: peer channel list
  * @peer_oper_classlen: peer operating class length
  * @peer_oper_class: peer operating class
- * @pref_off_channum: preferred offchannel number
+ * @pref_off_channum: peer offchannel number
  * @pref_off_chan_bandwidth: peer offchannel bandwidth
  * @opclass_for_prefoffchan: operating class for offchannel
- * @pref_offchan_freq: preferred offchannel frequency
  */
 struct tdls_peer_params {
 	uint8_t is_peer_responder;
@@ -907,7 +903,6 @@ struct tdls_peer_params {
 	uint8_t pref_off_channum;
 	uint8_t pref_off_chan_bandwidth;
 	uint8_t opclass_for_prefoffchan;
-	uint32_t pref_offchan_freq;
 };
 
 /**
@@ -933,7 +928,6 @@ struct tdls_peer_update_state {
  * @tdls_off_ch: Target Off Channel
  * @oper_class: Operating class for target channel
  * @is_responder: Responder or initiator
- * @tdls_off_chan_freq: Target Off Channel frequency
  */
 struct tdls_channel_switch_params {
 	uint32_t    vdev_id;
@@ -943,7 +937,6 @@ struct tdls_channel_switch_params {
 	uint8_t     tdls_sw_mode;
 	uint8_t     oper_class;
 	uint8_t     is_responder;
-	uint32_t    tdls_off_chan_freq;
 };
 
 /**
@@ -1194,24 +1187,24 @@ enum legacy_result_code {
 
 /**
  * struct tdls_send_mgmt_rsp - TDLS Response struct PE --> TDLS module
- * @vdev_id: vdev id
+ * @session_id: session id
  * @status_code: status code as tSirResultCodes
  * @psoc: soc object
  */
 struct tdls_send_mgmt_rsp {
-	uint8_t vdev_id;
+	uint8_t session_id;
 	enum legacy_result_code status_code;
 	struct wlan_objmgr_psoc *psoc;
 };
 
 /**
  * struct tdls_mgmt_tx_completion_ind - TDLS TX completion PE --> TDLS module
- * @vdev_id: vdev_id
+ * @session_id: session id
  * @tx_complete_status: tx complete status
  * @psoc: soc object
  */
 struct tdls_mgmt_tx_completion_ind {
-	uint8_t vdev_id;
+	uint8_t session_id;      /* Session ID */
 	uint32_t tx_complete_status;
 	struct wlan_objmgr_psoc *psoc;
 };
@@ -1221,6 +1214,7 @@ struct tdls_mgmt_tx_completion_ind {
  * @status_code: status code as tSirResultCodes
  * @peermac: MAC address of the TDLS peer
  * @session_id: session id
+ * @sta_id: sta id
  * @sta_type: sta type
  * @tdls_oper: add peer type
  * @psoc: soc object
@@ -1229,6 +1223,7 @@ struct tdls_add_sta_rsp {
 	QDF_STATUS status_code;
 	struct qdf_mac_addr peermac;
 	uint8_t session_id;
+	uint16_t sta_id;
 	uint16_t sta_type;
 	enum tdls_add_oper tdls_oper;
 	struct wlan_objmgr_psoc *psoc;
@@ -1239,12 +1234,14 @@ struct tdls_add_sta_rsp {
  * @session_id: session id
  * @status_code: status code as tSirResultCodes
  * @peermac: MAC address of the TDLS peer
+ * @sta_id: sta id
  * @psoc: soc object
  */
 struct tdls_del_sta_rsp {
 	uint8_t session_id;
 	QDF_STATUS status_code;
 	struct qdf_mac_addr peermac;
+	uint16_t sta_id;
 	struct wlan_objmgr_psoc *psoc;
 };
 

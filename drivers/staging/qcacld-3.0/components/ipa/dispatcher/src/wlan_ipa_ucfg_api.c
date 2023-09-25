@@ -39,10 +39,10 @@ bool ucfg_ipa_uc_is_enabled(void)
 	return ipa_config_is_uc_enabled();
 }
 
-void ucfg_ipa_set_pdev_id(struct wlan_objmgr_psoc *psoc,
-			  uint8_t pdev_id)
+void ucfg_ipa_set_txrx_handle(struct wlan_objmgr_psoc *psoc,
+				    void *txrx_handle)
 {
-	return ipa_set_pdev_id(psoc, pdev_id);
+	return ipa_set_txrx_handle(psoc, txrx_handle);
 }
 
 void ucfg_ipa_set_dp_handle(struct wlan_objmgr_psoc *psoc,
@@ -99,15 +99,8 @@ void ucfg_ipa_reg_send_to_nw_cb(struct wlan_objmgr_pdev *pdev,
 				wlan_ipa_send_to_nw cb)
 {
 	return ipa_reg_send_to_nw_cb(pdev, cb);
-}
 
-#ifdef IPA_LAN_RX_NAPI_SUPPORT
-void ucfg_ipa_reg_rps_enable_cb(struct wlan_objmgr_pdev *pdev,
-				wlan_ipa_rps_enable cb)
-{
-	return ipa_reg_rps_enable_cb(pdev, cb);
 }
-#endif
 
 void ucfg_ipa_set_mcc_mode(struct wlan_objmgr_pdev *pdev, bool mcc_mode)
 {
@@ -168,11 +161,11 @@ QDF_STATUS ucfg_ipa_send_mcc_scc_msg(struct wlan_objmgr_pdev *pdev,
 
 QDF_STATUS ucfg_ipa_wlan_evt(struct wlan_objmgr_pdev *pdev,
 			     qdf_netdev_t net_dev, uint8_t device_mode,
-			     uint8_t session_id,
+			     uint8_t sta_id, uint8_t session_id,
 			     enum wlan_ipa_wlan_event ipa_event_type,
 			     uint8_t *mac_addr)
 {
-	return ipa_wlan_evt(pdev, net_dev, device_mode, session_id,
+	return ipa_wlan_evt(pdev, net_dev, device_mode, sta_id, session_id,
 			    ipa_event_type, mac_addr);
 }
 
