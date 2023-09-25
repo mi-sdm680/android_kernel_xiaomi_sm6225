@@ -276,8 +276,7 @@ static const struct osif_cipher_crypto_mapping
 #endif
 };
 
-wlan_crypto_auth_mode
-osif_nl_to_crypto_auth_type(enum nl80211_auth_type auth_type)
+int osif_nl_to_crypto_auth_type(enum nl80211_auth_type auth_type)
 {
 	wlan_crypto_auth_mode crypto_auth_type = WLAN_CRYPTO_AUTH_NONE;
 
@@ -285,17 +284,15 @@ osif_nl_to_crypto_auth_type(enum nl80211_auth_type auth_type)
 	    auth_type >= QDF_ARRAY_SIZE(osif_auth_type_crypto_mapping)) {
 		QDF_TRACE_ERROR(QDF_MODULE_ID_OS_IF, "Unknown type: %d",
 				auth_type);
-		return crypto_auth_type;
+		return -EINVAL;
 	}
-
-	crypto_auth_type = osif_auth_type_crypto_mapping[auth_type];
 	QDF_TRACE_DEBUG(QDF_MODULE_ID_OS_IF, "Auth type, NL: %d, crypto: %d",
-			auth_type, crypto_auth_type);
+			auth_type, osif_auth_type_crypto_mapping[auth_type]);
 
 	return crypto_auth_type;
 }
 
-wlan_crypto_key_mgmt osif_nl_to_crypto_akm_type(u32 key_mgmt)
+int osif_nl_to_crypto_akm_type(u32 key_mgmt)
 {
 	uint8_t index;
 	wlan_crypto_key_mgmt crypto_akm_type = WLAN_CRYPTO_KEY_MGMT_NONE;
@@ -310,12 +307,13 @@ wlan_crypto_key_mgmt osif_nl_to_crypto_akm_type(u32 key_mgmt)
 			break;
 		}
 	}
-	if (!akm_type_crypto_exist)
+	if (!akm_type_crypto_exist) {
 		QDF_TRACE_ERROR(QDF_MODULE_ID_OS_IF, "Unknown type: %d",
 				key_mgmt);
-	else
-		QDF_TRACE_DEBUG(QDF_MODULE_ID_OS_IF, "Akm suite, NL: %d, crypto: %d",
-				key_mgmt, crypto_akm_type);
+		return -EINVAL;
+	}
+	QDF_TRACE_DEBUG(QDF_MODULE_ID_OS_IF, "Akm suite, NL: %d, crypto: %d",
+			key_mgmt, crypto_akm_type);
 
 	return crypto_akm_type;
 }

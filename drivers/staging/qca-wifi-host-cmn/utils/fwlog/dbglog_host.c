@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1323,16 +1323,6 @@ int dbglog_set_mod_log_lvl(wmi_unified_t wmi_handle, uint32_t mod_log_lvl)
 {
 	/* set the global module level to log_lvl */
 	wma_config_debug_module_cmd(wmi_handle, WMI_DEBUG_LOG_PARAM_LOG_LEVEL,
-				    mod_log_lvl, NULL, 0);
-
-	return 0;
-}
-
-int dbglog_set_mod_wow_log_lvl(wmi_unified_t wmi_handle, uint32_t mod_log_lvl)
-{
-	/* set the global module level to log_lvl */
-	wma_config_debug_module_cmd(wmi_handle,
-				    WMI_DEBUG_LOG_PARAM_WOW_MOD_ENABLE_BITMAP,
 				    mod_log_lvl, NULL, 0);
 
 	return 0;
@@ -3600,9 +3590,8 @@ A_BOOL dbglog_coex_print_handler(uint32_t mod_id,
 			dbglog_printf_no_line_break(timestamp, vap_id, "%s: %u",
 						    dbg_id_str, args[0]);
 			for (i = 1; i < numargs; i++)
-				dbglog_printf_no_line_break(timestamp, vap_id,
-							    "%u", args[i]);
-			dbglog_printf_no_line_break(timestamp, vap_id, "\n");
+				printk("%u", args[i]);
+			printk("\n");
 		} else {
 			return false;
 		}

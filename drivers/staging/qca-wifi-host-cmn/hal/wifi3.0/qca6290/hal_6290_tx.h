@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -46,6 +46,7 @@ static void hal_tx_desc_set_dscp_tid_table_id_6290(void *desc,
 		  DSCP_TID_TABLE_NUM, id);
 }
 #else
+#ifdef CONFIG_MCL
 static void hal_tx_desc_set_dscp_tid_table_id_6290(void *desc,
 						   uint8_t id)
 {
@@ -54,6 +55,7 @@ static void hal_tx_desc_set_dscp_tid_table_id_6290(void *desc,
 			HAL_TX_SM(TCL_DATA_CMD_3,
 				  DSCP_TO_TID_PRIORITY_TABLE_ID, id);
 }
+#endif
 #endif
 
 
@@ -72,14 +74,15 @@ static void hal_tx_desc_set_dscp_tid_table_id_6290(void *desc,
  *
  * Return: none
  */
-static void hal_tx_set_dscp_tid_map_6290(struct hal_soc *soc,
-					 uint8_t *map,
+static void hal_tx_set_dscp_tid_map_6290(void *hal_soc, uint8_t *map,
 					 uint8_t id)
 {
 	int i;
 	uint32_t addr, cmn_reg_addr;
 	uint32_t value = 0, regval;
 	uint8_t val[DSCP_TID_TABLE_SIZE], cnt = 0;
+
+	struct hal_soc *soc = (struct hal_soc *)hal_soc;
 
 	if (id >= HAL_MAX_HW_DSCP_TID_MAPS_11AX)
 		return;
@@ -109,7 +112,7 @@ static void hal_tx_set_dscp_tid_map_6290(struct hal_soc *soc,
 			(map[i + 6] << 0x12) |
 			(map[i + 7] << 0x15));
 
-		qdf_mem_copy(&val[cnt], &value, 3);
+		qdf_mem_copy(&val[cnt], (void *)&value, 3);
 		cnt += 3;
 	}
 
@@ -128,13 +131,14 @@ static void hal_tx_set_dscp_tid_map_6290(struct hal_soc *soc,
 	HAL_REG_WRITE(soc, cmn_reg_addr, regval);
 }
 #else
-static void hal_tx_set_dscp_tid_map_6290(struct hal_soc *soc,
-					 uint8_t *map,
+static void hal_tx_set_dscp_tid_map_6290(void *hal_soc, uint8_t *map,
 					 uint8_t id)
 {
 	int i;
 	uint32_t addr;
 	uint32_t value;
+
+	struct hal_soc *soc = (struct hal_soc *)hal_soc;
 
 	if (id == HAL_TX_DSCP_TID_MAP_TABLE_DEFAULT) {
 		addr =
@@ -177,13 +181,14 @@ static void hal_tx_set_dscp_tid_map_6290(struct hal_soc *soc,
  *
  * Return: void
  */
-static void hal_tx_update_dscp_tid_6290(struct hal_soc *soc, uint8_t tid,
+static void hal_tx_update_dscp_tid_6290(void *hal_soc, uint8_t tid,
 					uint8_t id, uint8_t dscp)
 {
 	int index;
 	uint32_t addr;
 	uint32_t value;
 	uint32_t regval;
+	struct hal_soc *soc = (struct hal_soc *)hal_soc;
 
 	addr = HWIO_TCL_R0_DSCP_TID_MAP_n_ADDR(
 			SEQ_WCSS_UMAC_MAC_TCL_REG_OFFSET, id);
@@ -199,13 +204,15 @@ static void hal_tx_update_dscp_tid_6290(struct hal_soc *soc, uint8_t tid,
 	HAL_REG_WRITE(soc, addr, (regval & HWIO_TCL_R0_DSCP_TID_MAP_n_RMSK));
 }
 #else
-static void hal_tx_update_dscp_tid_6290(struct hal_soc *soc, uint8_t tid,
+static void hal_tx_update_dscp_tid_6290(void *hal_soc, uint8_t tid,
 					uint8_t id, uint8_t dscp)
 {
 	int index;
 	uint32_t addr;
 	uint32_t value;
 	uint32_t regval;
+
+	struct hal_soc *soc = (struct hal_soc *)hal_soc;
 
 	if (id == HAL_TX_DSCP_TID_MAP_TABLE_DEFAULT)
 		addr =

@@ -33,9 +33,8 @@
 
 /**
  * struct reorder_q_setup - reorder queue setup params
- * @psoc: psoc
+ * @pdev: pdev
  * @vdev_id: vdev id
- * @pdev_id: pdev id
  * @peer_macaddr: peer mac address
  * @hw_qdesc: hw queue descriptor
  * @tid: tid number
@@ -44,9 +43,8 @@
  * @ba_window_size: BA window size
  */
 struct reorder_q_setup {
-	struct cdp_ctrl_objmgr_psoc *psoc;
+	struct cdp_ctrl_objmgr_pdev *pdev;
 	uint8_t vdev_id;
-	uint8_t pdev_id;
 	uint8_t peer_mac[QDF_MAC_ADDR_SIZE];
 	qdf_dma_addr_t hw_qdesc_paddr;
 	uint8_t tid;
@@ -57,8 +55,7 @@ struct reorder_q_setup {
 
 /**
  * target_if_peer_set_default_routing() - set peer default routing
- * @psoc: psoc pointer
- * @pdev_id: pdev id
+ * @pdev: pdev pointer
  * @peer_macaddr: peer mac address
  * @vdev_id: vdev id
  * @hash_based: hash based routing
@@ -67,14 +64,13 @@ struct reorder_q_setup {
  * return: void
  */
 void
-target_if_peer_set_default_routing(struct cdp_ctrl_objmgr_psoc *psoc,
-				   uint8_t pdev_id,
+target_if_peer_set_default_routing(struct cdp_ctrl_objmgr_pdev *pdev,
 				   uint8_t *peer_macaddr, uint8_t vdev_id,
 				   bool hash_based, uint8_t ring_num);
+
 /**
  * target_if_peer_rx_reorder_queue_setup() - setup rx reorder queue
  * @pdev: pdev pointer
- * @pdev_id: pdev id
  * @vdev_id: vdev id
  * @peer_macaddr: peer mac address
  * @hw_qdesc: hw queue descriptor
@@ -86,8 +82,7 @@ target_if_peer_set_default_routing(struct cdp_ctrl_objmgr_psoc *psoc,
  * return: QDF_STATUS_SUCCESS for success or error code
  */
 QDF_STATUS
-target_if_peer_rx_reorder_queue_setup(struct cdp_ctrl_objmgr_psoc *psoc,
-				      uint8_t pdev_id,
+target_if_peer_rx_reorder_queue_setup(struct cdp_ctrl_objmgr_pdev *pdev,
 				      uint8_t vdev_id, uint8_t *peer_macaddr,
 				      qdf_dma_addr_t hw_qdesc, int tid,
 				      uint16_t queue_no,
@@ -96,8 +91,7 @@ target_if_peer_rx_reorder_queue_setup(struct cdp_ctrl_objmgr_psoc *psoc,
 
 /**
  * target_if_peer_rx_reorder_queue_remove() - remove rx reorder queue
- * @psoc: psoc pointer
- * @pdev_id: pdev id
+ * @pdev: pdev pointer
  * @vdev_id: vdev id
  * @peer_macaddr: peer mac address
  * @peer_tid_bitmap: peer tid bitmap
@@ -105,8 +99,7 @@ target_if_peer_rx_reorder_queue_setup(struct cdp_ctrl_objmgr_psoc *psoc,
  * return: QDF_STATUS_SUCCESS for success or error code
  */
 QDF_STATUS
-target_if_peer_rx_reorder_queue_remove(struct cdp_ctrl_objmgr_psoc *psoc,
-				       uint8_t pdev_id,
+target_if_peer_rx_reorder_queue_remove(struct cdp_ctrl_objmgr_pdev *pdev,
 				       uint8_t vdev_id, uint8_t *peer_macaddr,
 				       uint32_t peer_tid_bitmap);
 
@@ -118,7 +111,7 @@ target_if_peer_rx_reorder_queue_remove(struct cdp_ctrl_objmgr_psoc *psoc,
  * return: QDF_STATUS_SUCCESS for success or error code
  */
 QDF_STATUS
-target_if_lro_hash_config(struct cdp_ctrl_objmgr_psoc *psoc, uint8_t pdev_id,
+target_if_lro_hash_config(struct cdp_ctrl_objmgr_pdev *pdev,
 			  struct cdp_lro_hash_config *lro_hash_cfg);
 
 #endif

@@ -70,16 +70,14 @@ static QDF_STATUS target_process_bang_radar_cmd(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS target_send_ocac_abort_cmd(struct wlan_objmgr_pdev *pdev);
 /**
- * target_send_agile_ch_cfg_cmd() - Send agile channel parameters to target for
+ * target_send_agile_ch_cfg_cmd() - Send agile channel to target for
  * off channel precac.
  * @pdev: Pointer to DFS pdev object.
- * @adfs_param: Agile-DFS CAC parameters.
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS
-target_send_agile_ch_cfg_cmd(struct wlan_objmgr_pdev *pdev,
-			     struct dfs_agile_cac_params *adfs_param);
+QDF_STATUS target_send_agile_ch_cfg_cmd(struct wlan_objmgr_pdev *pdev,
+					uint8_t *ch_freq);
 #else
 static inline QDF_STATUS
 target_send_ocac_abort_cmd(struct wlan_objmgr_pdev *pdev)
@@ -89,7 +87,7 @@ target_send_ocac_abort_cmd(struct wlan_objmgr_pdev *pdev)
 
 static inline QDF_STATUS
 target_send_agile_ch_cfg_cmd(struct wlan_objmgr_pdev *pdev,
-			     struct dfs_agile_cac_params *adfs_param)
+			     uint8_t *ch_freq)
 {
 	return QDF_STATUS_SUCCESS;
 }

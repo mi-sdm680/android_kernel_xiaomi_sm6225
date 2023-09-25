@@ -22,8 +22,6 @@
  * target if layer.
  */
 #include "../../../../umac/wifi_pos/src/wifi_pos_utils_i.h"
-#include "wifi_pos_utils_pub.h"
-
 #include "wmi_unified_api.h"
 #include "wlan_lmac_if_def.h"
 #include "target_if_wifi_pos.h"
@@ -86,7 +84,7 @@ static QDF_STATUS target_if_wifi_pos_replenish_ring(
 
 static QDF_STATUS target_if_wifi_pos_get_indirect_data(
 		struct wifi_pos_psoc_priv_obj *priv_obj,
-		struct wmi_host_oem_indirect_data *indirect,
+		wmi_oem_indirect_data *indirect,
 		struct oem_data_rsp *rsp, uint32_t *cookie)
 {
 	void *paddr = NULL;
@@ -140,7 +138,7 @@ static QDF_STATUS target_if_wifi_pos_replenish_ring(
 
 static QDF_STATUS target_if_wifi_pos_get_indirect_data(
 		struct wifi_pos_psoc_priv_obj *priv_obj,
-		struct wmi_host_oem_indirect_data *indirect,
+		wmi_oem_indirect_data *indirect,
 		struct oem_data_rsp *rsp, uint32_t *cookie)
 {
 	return QDF_STATUS_SUCCESS;
@@ -164,28 +162,20 @@ static int target_if_wifi_pos_oem_rsp_ev_handler(ol_scn_t scn,
 	uint8_t ring_idx = 0;
 	QDF_STATUS status;
 	uint32_t cookie = 0;
-	struct wmi_host_oem_indirect_data *indirect;
+	wmi_oem_indirect_data *indirect;
 	struct oem_data_rsp oem_rsp = {0};
 	struct wifi_pos_psoc_priv_obj *priv_obj;
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_lmac_if_wifi_pos_rx_ops *wifi_pos_rx_ops;
-	struct wmi_oem_response_param oem_resp_param = {0};
-	wmi_unified_t wmi_handle;
+	struct wlan_objmgr_psoc *psoc = wifi_pos_get_psoc();
+	struct wlan_lmac_if_wifi_pos_rx_ops *wifi_pos_rx_ops = NULL;
+	WMI_OEM_RESPONSE_EVENTID_param_tlvs *param_buf =
+		(WMI_OEM_RESPONSE_EVENTID_param_tlvs *)data_buf;
 
-	psoc = target_if_get_psoc_from_scn_hdl(scn);
 	if (!psoc) {
 		target_if_err("psoc is null");
 		return QDF_STATUS_NOT_INITIALIZED;
 	}
 
 	wlan_objmgr_psoc_get_ref(psoc, WLAN_WIFI_POS_TGT_IF_ID);
-
-	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
-		wlan_objmgr_psoc_release_ref(psoc, WLAN_WIFI_POS_TGT_IF_ID);
-		return QDF_STATUS_NOT_INITIALIZED;
-	}
 
 	priv_obj = wifi_pos_get_psoc_priv_obj(psoc);
 	if (!priv_obj) {
@@ -201,19 +191,15 @@ static int target_if_wifi_pos_oem_rsp_ev_handler(ol_scn_t scn,
 		return QDF_STATUS_NOT_INITIALIZED;
 	}
 
-	ret = wmi_extract_oem_response_param(wmi_handle,
-					     data_buf,
-					     &oem_resp_param);
+	oem_rsp.rsp_len_1 = param_buf->num_data;
+	oem_rsp.data_1 = param_buf->data;
 
-	oem_rsp.rsp_len_1 = oem_resp_param.num_data1;
-	oem_rsp.data_1    = oem_resp_param.data_1;
-
-	if (oem_resp_param.num_data2) {
-		oem_rsp.rsp_len_2 = oem_resp_param.num_data2;
-		oem_rsp.data_2    = oem_resp_param.data_2;
+	if (param_buf->num_data2) {
+		oem_rsp.rsp_len_2 = param_buf->num_data2;
+		oem_rsp.data_2 = param_buf->data2;
 	}
 
-	indirect = &oem_resp_param.indirect_data;
+	indirect = (wmi_oem_indirect_data *)param_buf->indirect_data;
 	status = target_if_wifi_pos_get_indirect_data(priv_obj, indirect,
 						      &oem_rsp, &cookie);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -284,18 +270,17 @@ static int wifi_pos_oem_err_rpt_ev_handler(ol_scn_t scn, uint8_t *buf,
 }
 
 /**
- * target_if_wifi_pos_oem_data_req() - start OEM data request to target
- * @psoc: pointer to psoc object mgr
+ * wifi_pos_oem_data_req() - start OEM data request to target
+ * @psoc: the pointer to psoc object manager
  * @req: start request params
  *
  * Return: QDF_STATUS
  */
-static QDF_STATUS
-target_if_wifi_pos_oem_data_req(struct wlan_objmgr_pdev *pdev,
-				struct oem_data_req *req)
+static QDF_STATUS wifi_pos_oem_data_req(struct wlan_objmgr_psoc *psoc,
+					struct oem_data_req *req)
 {
 	QDF_STATUS status;
-	wmi_unified_t wmi_hdl = get_wmi_unified_hdl_from_pdev(pdev);
+	void *wmi_hdl = GET_WMI_HDL_FROM_PSOC(psoc);
 
 	target_if_debug("Send oem data req to target");
 
@@ -322,14 +307,25 @@ void target_if_wifi_pos_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 {
 	struct wlan_lmac_if_wifi_pos_tx_ops *wifi_pos_tx_ops;
 	wifi_pos_tx_ops = &tx_ops->wifi_pos_tx_ops;
-	wifi_pos_tx_ops->data_req_tx = target_if_wifi_pos_oem_data_req;
-	wifi_pos_tx_ops->wifi_pos_register_events =
-		target_if_wifi_pos_register_events;
-	wifi_pos_tx_ops->wifi_pos_deregister_events =
-		target_if_wifi_pos_deregister_events;
-	wifi_pos_tx_ops->wifi_pos_get_vht_ch_width =
-		target_if_wifi_pos_get_vht_ch_width;
+	wifi_pos_tx_ops->data_req_tx = wifi_pos_oem_data_req;
+}
 
+void target_if_wifi_pos_register_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
+{
+	struct wlan_lmac_if_wifi_pos_rx_ops *wifi_pos_rx_ops;
+	wifi_pos_rx_ops = &rx_ops->wifi_pos_rx_ops;
+	wifi_pos_rx_ops->oem_rsp_event_rx = wifi_pos_oem_rsp_handler;
+}
+
+inline struct wlan_lmac_if_wifi_pos_tx_ops *target_if_wifi_pos_get_txops(
+						struct wlan_objmgr_psoc *psoc)
+{
+	if (!psoc) {
+		target_if_err("passed psoc is NULL");
+		return NULL;
+	}
+
+	return &psoc->soc_cb.tx_ops.wifi_pos_tx_ops;
 }
 
 inline struct wlan_lmac_if_wifi_pos_rx_ops *target_if_wifi_pos_get_rxops(
@@ -352,14 +348,15 @@ QDF_STATUS target_if_wifi_pos_register_events(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	/* wmi_oem_response_event_id is not defined for legacy targets.
-	 * So do not check for error for this event.
-	 */
-	wmi_unified_register_event_handler(
+	ret = wmi_unified_register_event_handler(
 			get_wmi_unified_hdl_from_psoc(psoc),
 			wmi_oem_response_event_id,
 			target_if_wifi_pos_oem_rsp_ev_handler,
 			WMI_RX_WORK_CTX);
+	if (ret) {
+		target_if_err("register_event_handler failed: err %d", ret);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	ret = wmi_unified_register_event_handler(
 			get_wmi_unified_hdl_from_psoc(psoc),
@@ -413,33 +410,6 @@ QDF_STATUS target_if_wifi_pos_deregister_events(struct wlan_objmgr_psoc *psoc)
 	wmi_unified_unregister_event_handler(
 			get_wmi_unified_hdl_from_psoc(psoc),
 			wmi_oem_report_event_id);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS target_if_wifi_pos_get_vht_ch_width(struct wlan_objmgr_psoc *psoc,
-					       enum phy_ch_width *ch_width)
-{
-	struct target_psoc_info *tgt_hdl;
-	int vht_cap_info;
-
-	*ch_width = CH_WIDTH_INVALID;
-
-	if (!psoc)
-		return QDF_STATUS_E_INVAL;
-
-	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
-	if (!tgt_hdl)
-		return QDF_STATUS_E_INVAL;
-
-	*ch_width = CH_WIDTH_80MHZ;
-
-	vht_cap_info = target_if_get_vht_cap_info(tgt_hdl);
-
-	if (vht_cap_info & WLAN_VHTCAP_SUP_CHAN_WIDTH_80_160)
-		*ch_width = CH_WIDTH_80P80MHZ;
-	else if (vht_cap_info & WLAN_VHTCAP_SUP_CHAN_WIDTH_160)
-		*ch_width = CH_WIDTH_160MHZ;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -605,7 +575,7 @@ static QDF_STATUS target_if_wifi_pos_cfg_fw(struct wlan_objmgr_psoc *psoc,
 {
 	uint8_t i;
 	QDF_STATUS status;
-	wmi_unified_t wmi_hdl = GET_WMI_HDL_FROM_PSOC(psoc);
+	void *wmi_hdl = GET_WMI_HDL_FROM_PSOC(psoc);
 	wmi_oem_dma_ring_cfg_req_fixed_param cfg = {0};
 
 	if (!wmi_hdl) {

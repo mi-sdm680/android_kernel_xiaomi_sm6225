@@ -285,7 +285,7 @@ static QDF_STATUS fake_ocb_set_config_cmd_tlv(wmi_unified_t wmi_handle,
 			" max_pwr=%d, min_pwr=%d, reg_pwr=%d, antenna_max=%d, "
 			"flags=%d", i, config->channels[i].chan_freq,
 			config->channels[i].bandwidth,
-			QDF_MAC_ADDR_REF(
+			QDF_MAC_ADDR_ARRAY(
 				config->channels[i].mac_address.bytes),
 			config->channels[i].max_pwr,
 			config->channels[i].min_pwr,
@@ -408,6 +408,8 @@ static QDF_STATUS fake_vdev_start_cmd_tlv(wmi_unified_t wmi_handle,
 		req->preferred_tx_streams, req->preferred_rx_streams,
 		(int)req->ldpc_rx_enabled, req->cac_duration_ms,
 		req->regdomain, req->he_ops);
+	wma_remove_vdev_req(wma, req->vdev_id,
+			    WMA_TARGET_REQ_TYPE_VDEV_START);
 	ucfg_ocb_config_channel(wma->pdev);
 	return QDF_STATUS_SUCCESS;
 }

@@ -406,7 +406,7 @@ QDF_STATUS reg_save_new_11d_country(struct wlan_objmgr_psoc *psoc,
 		if (tx_ops->set_country_code) {
 			tx_ops->set_country_code(psoc, &country_code);
 		} else {
-			reg_err("NULL country set handler");
+			reg_err("country set handler is not present");
 			for (ctr = 0; ctr < psoc_priv_obj->num_phy; ctr++)
 				psoc_priv_obj->new_11d_ctry_pending[ctr] =
 					false;

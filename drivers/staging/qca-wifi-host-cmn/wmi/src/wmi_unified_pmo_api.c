@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -26,9 +26,11 @@
 #include "wlan_pmo_hw_filter_public_struct.h"
 
 #ifdef FEATURE_WLAN_D0WOW
-QDF_STATUS wmi_unified_d0wow_enable_send(wmi_unified_t wmi_handle,
+QDF_STATUS wmi_unified_d0wow_enable_send(void *wmi_hdl,
 					 uint8_t mac_id)
 {
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
 	if (wmi_handle->ops->send_d0wow_enable_cmd)
 		return wmi_handle->ops->send_d0wow_enable_cmd(wmi_handle,
 							      mac_id);
@@ -36,9 +38,11 @@ QDF_STATUS wmi_unified_d0wow_enable_send(wmi_unified_t wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS wmi_unified_d0wow_disable_send(wmi_unified_t wmi_handle,
+QDF_STATUS wmi_unified_d0wow_disable_send(void *wmi_hdl,
 					  uint8_t mac_id)
 {
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
 	if (wmi_handle->ops->send_d0wow_disable_cmd)
 		return wmi_handle->ops->send_d0wow_disable_cmd(wmi_handle,
 							       mac_id);
@@ -47,11 +51,13 @@ QDF_STATUS wmi_unified_d0wow_disable_send(wmi_unified_t wmi_handle,
 }
 #endif /* FEATURE_WLAN_D0WOW */
 
-QDF_STATUS wmi_unified_add_wow_wakeup_event_cmd(wmi_unified_t wmi_handle,
+QDF_STATUS wmi_unified_add_wow_wakeup_event_cmd(void *wmi_hdl,
 						uint32_t vdev_id,
 						uint32_t *bitmap,
 						bool enable)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *) wmi_hdl;
+
 	if (wmi_handle->ops->send_add_wow_wakeup_event_cmd)
 		return wmi_handle->ops->send_add_wow_wakeup_event_cmd(
 				wmi_handle, vdev_id, bitmap, enable);
@@ -59,14 +65,15 @@ QDF_STATUS wmi_unified_add_wow_wakeup_event_cmd(wmi_unified_t wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS wmi_unified_wow_patterns_to_fw_cmd(
-				wmi_unified_t wmi_handle,
+QDF_STATUS wmi_unified_wow_patterns_to_fw_cmd(void *wmi_hdl,
 				uint8_t vdev_id, uint8_t ptrn_id,
 				const uint8_t *ptrn, uint8_t ptrn_len,
 				uint8_t ptrn_offset, const uint8_t *mask,
 				uint8_t mask_len, bool user,
 				uint8_t default_patterns)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *) wmi_hdl;
+
 	if (wmi_handle->ops->send_wow_patterns_to_fw_cmd)
 		return wmi_handle->ops->send_wow_patterns_to_fw_cmd(wmi_handle,
 				vdev_id, ptrn_id, ptrn,
@@ -76,12 +83,13 @@ QDF_STATUS wmi_unified_wow_patterns_to_fw_cmd(
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS wmi_unified_enable_arp_ns_offload_cmd(
-			wmi_unified_t wmi_handle,
-			struct pmo_arp_offload_params *arp_offload_req,
-			struct pmo_ns_offload_params *ns_offload_req,
-			uint8_t vdev_id)
+QDF_STATUS wmi_unified_enable_arp_ns_offload_cmd(void *wmi_hdl,
+			   struct pmo_arp_offload_params *arp_offload_req,
+			   struct pmo_ns_offload_params *ns_offload_req,
+			   uint8_t vdev_id)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
+
 	if (wmi_handle->ops->send_enable_arp_ns_offload_cmd)
 		return wmi_handle->ops->send_enable_arp_ns_offload_cmd(
 				wmi_handle,
@@ -90,24 +98,26 @@ QDF_STATUS wmi_unified_enable_arp_ns_offload_cmd(
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS wmi_unified_add_clear_mcbc_filter_cmd(
-				wmi_unified_t wmi_handle,
-				uint8_t vdev_id,
-				struct qdf_mac_addr multicast_addr,
-				bool clear_list)
+QDF_STATUS wmi_unified_add_clear_mcbc_filter_cmd(void *wmi_hdl,
+				     uint8_t vdev_id,
+				     struct qdf_mac_addr multicast_addr,
+				     bool clearList)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
+
 	if (wmi_handle->ops->send_add_clear_mcbc_filter_cmd)
 		return wmi_handle->ops->send_add_clear_mcbc_filter_cmd(
-			wmi_handle, vdev_id, multicast_addr, clear_list);
+				wmi_handle, vdev_id, multicast_addr, clearList);
 
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS wmi_unified_multiple_add_clear_mcbc_filter_cmd(
-				wmi_unified_t wmi_handle,
+QDF_STATUS wmi_unified_multiple_add_clear_mcbc_filter_cmd(void *wmi_hdl,
 				uint8_t vdev_id,
 				struct pmo_mcast_filter_params *filter_param)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
+
 	if (wmi_handle->ops->send_multiple_add_clear_mcbc_filter_cmd)
 		return wmi_handle->ops->send_multiple_add_clear_mcbc_filter_cmd(
 				wmi_handle, vdev_id, filter_param);
@@ -115,21 +125,24 @@ QDF_STATUS wmi_unified_multiple_add_clear_mcbc_filter_cmd(
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS wmi_unified_conf_hw_filter_cmd(wmi_unified_t wmi_handle,
+QDF_STATUS wmi_unified_conf_hw_filter_cmd(void *opaque_wmi,
 					  struct pmo_hw_filter_params *req)
 {
-	if (!wmi_handle->ops->send_conf_hw_filter_cmd)
+	struct wmi_unified *wmi = opaque_wmi;
+
+	if (!wmi->ops->send_conf_hw_filter_cmd)
 		return QDF_STATUS_E_NOSUPPORT;
 
-	return wmi_handle->ops->send_conf_hw_filter_cmd(wmi_handle, req);
+	return wmi->ops->send_conf_hw_filter_cmd(wmi, req);
 }
 
-QDF_STATUS wmi_unified_send_gtk_offload_cmd(wmi_unified_t wmi_handle,
-					    uint8_t vdev_id,
+QDF_STATUS wmi_unified_send_gtk_offload_cmd(void *wmi_hdl, uint8_t vdev_id,
 					    struct pmo_gtk_req  *params,
 					    bool enable_offload,
 					    uint32_t gtk_offload_opcode)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
+
 	if (wmi_handle->ops->send_gtk_offload_cmd)
 		return wmi_handle->ops->send_gtk_offload_cmd(wmi_handle,
 				vdev_id, params, enable_offload,
@@ -138,11 +151,12 @@ QDF_STATUS wmi_unified_send_gtk_offload_cmd(wmi_unified_t wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS wmi_unified_process_gtk_offload_getinfo_cmd(
-				wmi_unified_t wmi_handle,
+QDF_STATUS wmi_unified_process_gtk_offload_getinfo_cmd(void *wmi_hdl,
 				uint8_t vdev_id,
 				uint64_t offload_req_opcode)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
+
 	if (wmi_handle->ops->send_process_gtk_offload_getinfo_cmd)
 		return wmi_handle->ops->send_process_gtk_offload_getinfo_cmd(
 				wmi_handle, vdev_id, offload_req_opcode);
@@ -151,8 +165,9 @@ QDF_STATUS wmi_unified_process_gtk_offload_getinfo_cmd(
 }
 
 QDF_STATUS wmi_unified_enable_enhance_multicast_offload_cmd(
-		wmi_unified_t wmi_handle, uint8_t vdev_id, bool action)
+		void *wmi_hdl, uint8_t vdev_id, bool action)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
 	struct wmi_ops *ops;
 
 	ops = wmi_handle->ops;
@@ -163,10 +178,11 @@ QDF_STATUS wmi_unified_enable_enhance_multicast_offload_cmd(
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS wmi_extract_gtk_rsp_event(
-	wmi_unified_t wmi_handle, void *evt_buf,
+QDF_STATUS wmi_extract_gtk_rsp_event(void *wmi_hdl, void *evt_buf,
 	struct pmo_gtk_rsp_params *gtk_rsp_param, uint32_t len)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
+
 	if (wmi_handle->ops->extract_gtk_rsp_event)
 		return wmi_handle->ops->extract_gtk_rsp_event(wmi_handle,
 				evt_buf, gtk_rsp_param, len);
@@ -175,11 +191,12 @@ QDF_STATUS wmi_extract_gtk_rsp_event(
 }
 
 #ifdef FEATURE_WLAN_RA_FILTERING
-QDF_STATUS wmi_unified_wow_sta_ra_filter_cmd(wmi_unified_t wmi_handle,
-					     uint8_t vdev_id,
-					     uint8_t default_pattern,
-					     uint16_t rate_limit_interval)
+QDF_STATUS wmi_unified_wow_sta_ra_filter_cmd(void *wmi_hdl,
+				uint8_t vdev_id, uint8_t default_pattern,
+				uint16_t rate_limit_interval)
 {
+
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
 
 	if (wmi_handle->ops->send_wow_sta_ra_filter_cmd)
 		return wmi_handle->ops->send_wow_sta_ra_filter_cmd(wmi_handle,
@@ -190,10 +207,11 @@ QDF_STATUS wmi_unified_wow_sta_ra_filter_cmd(wmi_unified_t wmi_handle,
 }
 #endif /* FEATURE_WLAN_RA_FILTERING */
 
-QDF_STATUS wmi_unified_action_frame_patterns_cmd(
-		wmi_unified_t wmi_handle,
+QDF_STATUS wmi_unified_action_frame_patterns_cmd(void *wmi_hdl,
 		struct pmo_action_wakeup_set_params *action_params)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
+
 	if (wmi_handle->ops->send_action_frame_patterns_cmd)
 		return wmi_handle->ops->send_action_frame_patterns_cmd(
 				wmi_handle, action_params);
@@ -202,10 +220,11 @@ QDF_STATUS wmi_unified_action_frame_patterns_cmd(
 }
 
 #ifdef FEATURE_WLAN_LPHB
-QDF_STATUS wmi_unified_lphb_config_hbenable_cmd(
-		wmi_unified_t wmi_handle,
-		wmi_hb_set_enable_cmd_fixed_param *params)
+QDF_STATUS wmi_unified_lphb_config_hbenable_cmd(void *wmi_hdl,
+				wmi_hb_set_enable_cmd_fixed_param *params)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
+
 	if (wmi_handle->ops->send_lphb_config_hbenable_cmd)
 		return wmi_handle->ops->send_lphb_config_hbenable_cmd(
 				wmi_handle, params);
@@ -213,10 +232,11 @@ QDF_STATUS wmi_unified_lphb_config_hbenable_cmd(
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS wmi_unified_lphb_config_tcp_params_cmd(
-		wmi_unified_t wmi_handle,
-		wmi_hb_set_tcp_params_cmd_fixed_param *lphb_conf_req)
+QDF_STATUS wmi_unified_lphb_config_tcp_params_cmd(void *wmi_hdl,
+		    wmi_hb_set_tcp_params_cmd_fixed_param *lphb_conf_req)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
+
 	if (wmi_handle->ops->send_lphb_config_tcp_params_cmd)
 		return wmi_handle->ops->send_lphb_config_tcp_params_cmd(
 				wmi_handle, lphb_conf_req);
@@ -224,10 +244,11 @@ QDF_STATUS wmi_unified_lphb_config_tcp_params_cmd(
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS wmi_unified_lphb_config_tcp_pkt_filter_cmd(
-		wmi_unified_t wmi_handle,
+QDF_STATUS wmi_unified_lphb_config_tcp_pkt_filter_cmd(void *wmi_hdl,
 		wmi_hb_set_tcp_pkt_filter_cmd_fixed_param *g_hb_tcp_filter_fp)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
+
 	if (wmi_handle->ops->send_lphb_config_tcp_pkt_filter_cmd)
 		return wmi_handle->ops->send_lphb_config_tcp_pkt_filter_cmd(
 				wmi_handle, g_hb_tcp_filter_fp);
@@ -235,10 +256,11 @@ QDF_STATUS wmi_unified_lphb_config_tcp_pkt_filter_cmd(
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS wmi_unified_lphb_config_udp_params_cmd(
-			wmi_unified_t wmi_handle,
+QDF_STATUS wmi_unified_lphb_config_udp_params_cmd(void *wmi_hdl,
 			wmi_hb_set_udp_params_cmd_fixed_param *lphb_conf_req)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
+
 	if (wmi_handle->ops->send_lphb_config_udp_params_cmd)
 		return wmi_handle->ops->send_lphb_config_udp_params_cmd(
 				wmi_handle, lphb_conf_req);
@@ -246,10 +268,11 @@ QDF_STATUS wmi_unified_lphb_config_udp_params_cmd(
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS wmi_unified_lphb_config_udp_pkt_filter_cmd(
-		wmi_unified_t wmi_handle,
+QDF_STATUS wmi_unified_lphb_config_udp_pkt_filter_cmd(void *wmi_hdl,
 		wmi_hb_set_udp_pkt_filter_cmd_fixed_param *lphb_conf_req)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
+
 	if (wmi_handle->ops->send_lphb_config_udp_pkt_filter_cmd)
 		return wmi_handle->ops->send_lphb_config_udp_pkt_filter_cmd(
 				wmi_handle, lphb_conf_req);
@@ -259,10 +282,11 @@ QDF_STATUS wmi_unified_lphb_config_udp_pkt_filter_cmd(
 #endif /* FEATURE_WLAN_LPHB */
 
 #ifdef WLAN_FEATURE_PACKET_FILTERING
-QDF_STATUS
-wmi_unified_enable_disable_packet_filter_cmd(wmi_unified_t wmi_handle,
-					     uint8_t vdev_id, bool enable)
+QDF_STATUS wmi_unified_enable_disable_packet_filter_cmd(void *wmi_hdl,
+		uint8_t vdev_id, bool enable)
 {
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
 	if (wmi_handle->ops->send_enable_disable_packet_filter_cmd)
 		return wmi_handle->ops->send_enable_disable_packet_filter_cmd(
 				wmi_handle, vdev_id, enable);
@@ -270,11 +294,12 @@ wmi_unified_enable_disable_packet_filter_cmd(wmi_unified_t wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS wmi_unified_config_packet_filter_cmd(
-		wmi_unified_t wmi_handle,
+QDF_STATUS wmi_unified_config_packet_filter_cmd(void *wmi_hdl,
 		uint8_t vdev_id, struct pmo_rcv_pkt_fltr_cfg *rcv_filter_param,
 		uint8_t filter_id, bool enable)
 {
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
 	if (wmi_handle->ops->send_config_packet_filter_cmd)
 		return wmi_handle->ops->send_config_packet_filter_cmd(
 		wmi_handle, vdev_id, rcv_filter_param, filter_id, enable);
@@ -283,10 +308,11 @@ QDF_STATUS wmi_unified_config_packet_filter_cmd(
 }
 #endif /* WLAN_FEATURE_PACKET_FILTERING */
 
-QDF_STATUS wmi_unified_wow_delete_pattern_cmd(wmi_unified_t wmi_handle,
-					      uint8_t ptrn_id,
-					      uint8_t vdev_id)
+QDF_STATUS wmi_unified_wow_delete_pattern_cmd(void *wmi_hdl, uint8_t ptrn_id,
+					uint8_t vdev_id)
 {
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
 	if (wmi_handle->ops->send_wow_delete_pattern_cmd)
 		return wmi_handle->ops->send_wow_delete_pattern_cmd(wmi_handle,
 								    ptrn_id,
@@ -295,18 +321,21 @@ QDF_STATUS wmi_unified_wow_delete_pattern_cmd(wmi_unified_t wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS wmi_unified_host_wakeup_ind_to_fw_cmd(wmi_unified_t wmi_handle)
+QDF_STATUS wmi_unified_host_wakeup_ind_to_fw_cmd(void *wmi_hdl)
 {
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
 	if (wmi_handle->ops->send_host_wakeup_ind_to_fw_cmd)
 		return wmi_handle->ops->send_host_wakeup_ind_to_fw_cmd(wmi_handle);
 
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS wmi_unified_wow_timer_pattern_cmd(wmi_unified_t wmi_handle,
-					     uint8_t vdev_id,
+QDF_STATUS wmi_unified_wow_timer_pattern_cmd(void *wmi_hdl, uint8_t vdev_id,
 					     uint32_t cookie, uint32_t time)
 {
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
 	if (wmi_handle->ops->send_wow_timer_pattern_cmd)
 		return wmi_handle->ops->send_wow_timer_pattern_cmd(wmi_handle,
 							vdev_id, cookie, time);
@@ -315,9 +344,11 @@ QDF_STATUS wmi_unified_wow_timer_pattern_cmd(wmi_unified_t wmi_handle,
 }
 
 #ifdef WLAN_FEATURE_EXTWOW_SUPPORT
-QDF_STATUS wmi_unified_enable_ext_wow_cmd(wmi_unified_t wmi_handle,
+QDF_STATUS wmi_unified_enable_ext_wow_cmd(void *wmi_hdl,
 					  struct ext_wow_params *params)
 {
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
 	if (wmi_handle->ops->send_enable_ext_wow_cmd)
 		return wmi_handle->ops->send_enable_ext_wow_cmd(wmi_handle,
 								params);
@@ -325,10 +356,11 @@ QDF_STATUS wmi_unified_enable_ext_wow_cmd(wmi_unified_t wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS wmi_unified_set_app_type2_params_in_fw_cmd(
-				wmi_unified_t wmi_handle,
+QDF_STATUS wmi_unified_set_app_type2_params_in_fw_cmd(void *wmi_hdl,
 				struct app_type2_params *appType2Params)
 {
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
 	if (wmi_handle->ops->send_set_app_type2_params_in_fw_cmd)
 		return wmi_handle->ops->send_set_app_type2_params_in_fw_cmd(
 				wmi_handle, appType2Params);
@@ -336,10 +368,11 @@ QDF_STATUS wmi_unified_set_app_type2_params_in_fw_cmd(
 	return QDF_STATUS_E_FAILURE;
 }
 
-QDF_STATUS wmi_unified_app_type1_params_in_fw_cmd(
-				wmi_unified_t wmi_handle,
-				struct app_type1_params *app_type1_params)
+QDF_STATUS wmi_unified_app_type1_params_in_fw_cmd(void *wmi_hdl,
+				   struct app_type1_params *app_type1_params)
 {
+	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
+
 	if (wmi_handle->ops->send_app_type1_params_in_fw_cmd)
 		return wmi_handle->ops->send_app_type1_params_in_fw_cmd(
 				wmi_handle, app_type1_params);

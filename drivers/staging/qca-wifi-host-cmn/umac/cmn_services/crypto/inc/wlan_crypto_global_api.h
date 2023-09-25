@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -245,20 +245,6 @@ bool wlan_crypto_is_pmf_enabled(struct wlan_objmgr_vdev *vdev,
 					struct wlan_objmgr_peer *peer);
 
 /**
- * wlan_crypto_is_key_valid - called by mgmt txrx to check if key is valid
- * @vdev: vdev
- * @peer: peer
- * @keyidx : key index
- *
- * This function gets called by mgmt txrx to check if key is valid
- *
- * Return: true or false
- */
-bool wlan_crypto_is_key_valid(struct wlan_objmgr_vdev *vdev,
-			      struct wlan_objmgr_peer *peer,
-			      uint16_t keyidx);
-
-/**
  * wlan_crypto_add_mmie - called by mgmt txrx to add mmie in frame
  * @vdev: vdev
  * @frm:  frame starting pointer
@@ -320,21 +306,6 @@ QDF_STATUS wlan_crypto_rsnie_check(struct wlan_crypto_params *, uint8_t *frm);
  */
 uint8_t *wlan_crypto_build_wpaie(struct wlan_objmgr_vdev *vdev,
 					uint8_t *iebuf);
-
-/**
- * wlan_crypto_build_rsnie_with_pmksa() - called by mlme to build rsnie
- * @vdev: vdev
- * @iebuf: ie buffer
- * @pmksa: pmksa struct
- *
- * This function gets called by mlme to build rsnie from given vdev
- *
- * Return: end of buffer
- */
-uint8_t *wlan_crypto_build_rsnie_with_pmksa(struct wlan_objmgr_vdev *vdev,
-					    uint8_t *iebuf,
-					    struct wlan_crypto_pmksa *pmksa);
-
 /**
  * wlan_crypto_build_rsnie - called by mlme to build rsnie
  * @vdev: vdev
@@ -712,16 +683,6 @@ bool wlan_crypto_check_wpa_match(struct wlan_objmgr_psoc *psoc,
 				 peer_crypto_params);
 
 /**
- * wlan_crypto_parse_rsnxe_ie() - parse RSNXE IE
- * @rsnxe_ie: RSNXE IE pointer
- * @cap_len: pointer to hold len of ext capability
- *
- * Return: pointer to RSNXE capability or NULL
- */
-uint8_t *
-wlan_crypto_parse_rsnxe_ie(uint8_t *rsnxe_ie, uint8_t *cap_len);
-
-/**
  * wlan_set_vdev_crypto_prarams_from_ie - Sets vdev crypto params from IE info
  * @vdev: vdev pointer
  * @ie_ptr: pointer to IE
@@ -851,26 +812,6 @@ struct wlan_crypto_key *wlan_crypto_get_key(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS wlan_crypto_set_key_req(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_crypto_key *req,
 				   enum wlan_crypto_key_type key_type);
-
-/**
- * wlan_crypto_free_vdev_key - Free keys for vdev
- * @vdev: vdev object
- *
- * This function frees keys stored in vdev crypto object.
- *
- * Return: None
- */
-void wlan_crypto_free_vdev_key(struct wlan_objmgr_vdev *vdev);
-
-/**
- * wlan_crypto_reset_vdev_params - Reset params for vdev
- * @vdev: vdev object
- *
- * This function reset params stored in vdev crypto object.
- *
- * Return: None
- */
-void wlan_crypto_reset_vdev_params(struct wlan_objmgr_vdev *vdev);
 #else
 static inline void wlan_crypto_update_set_key_peer(
 						struct wlan_objmgr_vdev *vdev,
@@ -900,29 +841,7 @@ QDF_STATUS wlan_crypto_set_key_req(struct wlan_objmgr_vdev *vdev,
 {
 	return QDF_STATUS_SUCCESS;
 }
-
-static inline void wlan_crypto_free_vdev_key(struct wlan_objmgr_vdev *vdev)
-{
-}
-
-static inline void wlan_crypto_reset_vdev_prarams(struct wlan_objmgr_vdev *vdev)
-{
-}
 #endif /* CRYPTO_SET_KEY_CONVERGED */
-
-/**
- * wlan_crypto_get_peer_pmksa() - called to get pmksa based on pmksa parameter
- * @vdev: vdev
- * @pmksa: bssid
- *
- * This function is to get pmksa based on pmksa parameter
- *
- * Return: wlan_crypto_pmksa when match found else NULL.
- */
-struct wlan_crypto_pmksa *
-wlan_crypto_get_peer_pmksa(struct wlan_objmgr_vdev *vdev,
-			   struct wlan_crypto_pmksa *pmksa);
-
 /**
  * wlan_crypto_get_pmksa - called to get pmksa of bssid passed.
  * @vdev: vdev
@@ -935,21 +854,6 @@ wlan_crypto_get_peer_pmksa(struct wlan_objmgr_vdev *vdev,
 struct wlan_crypto_pmksa *
 wlan_crypto_get_pmksa(struct wlan_objmgr_vdev *vdev,
 		      struct qdf_mac_addr *bssid);
-
-/**
- * wlan_crypto_get_fils_pmksa  - Get the PMKSA for FILS
- * SSID, if the SSID and cache id matches
- * @vdev:     Pointer with VDEV object
- * @cache_id: Cache id
- * @ssid:     Pointer to ssid
- * @ssid_len: SSID length
- *
- * Return: PMKSA entry if the cache id and SSID matches
- */
-struct wlan_crypto_pmksa *
-wlan_crypto_get_fils_pmksa(struct wlan_objmgr_vdev *vdev,
-			   uint8_t *cache_id, uint8_t *ssid,
-			   uint8_t ssid_len);
 
 /**
  * wlan_crypto_pmksa_flush - called to flush saved pmksa
@@ -975,43 +879,5 @@ QDF_STATUS wlan_crypto_pmksa_flush(struct wlan_crypto_params *crypto_params);
 QDF_STATUS wlan_crypto_set_del_pmksa(struct wlan_objmgr_vdev *vdev,
 				     struct wlan_crypto_pmksa *pmksa,
 				     bool set);
-
-#if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
-/**
- * wlan_crypto_selective_clear_sae_single_pmk_entries - Clear the PMK entries
- * for BSS which have the single PMK flag set other than the current connected
- * AP
- * @vdev:       Vdev
- * @conn_bssid: Connected bssid
- */
-void
-wlan_crypto_selective_clear_sae_single_pmk_entries(
-		struct wlan_objmgr_vdev *vdev, struct qdf_mac_addr *conn_bssid);
-
-/**
- * wlan_crypto_set_sae_single_pmk_bss_cap - Set the peer SAE sinlge pmk
- * feature supported status
- * @vdev: Vdev
- * @bssid: BSSID for which the flag is to be set
- * @single_pmk_capable_bss: Flag to indicate Sae single pmk supported BSSID or
- * not
- */
-void wlan_crypto_set_sae_single_pmk_bss_cap(struct wlan_objmgr_vdev *vdev,
-					    struct qdf_mac_addr *bssid,
-					    bool single_pmk_capable_bss);
-#else
-static inline void
-wlan_crypto_selective_clear_sae_single_pmk_entries(
-		struct wlan_objmgr_vdev *vdev, struct qdf_mac_addr *conn_bssid)
-{
-}
-
-static inline
-void wlan_crypto_set_sae_single_pmk_bss_cap(struct wlan_objmgr_vdev *vdev,
-					    struct qdf_mac_addr *bssid,
-					    bool single_pmk_capable_bss)
-{
-}
-#endif
 
 #endif /* end of _WLAN_CRYPTO_GLOBAL_API_H_ */

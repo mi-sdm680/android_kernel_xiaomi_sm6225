@@ -258,32 +258,6 @@ mgmt_get_rrm_action_subtype(uint8_t action_code)
 	return frm_type;
 }
 
-static enum mgmt_frame_type
-mgmt_get_ft_action_subtype(uint8_t action_code)
-{
-	enum mgmt_frame_type frm_type;
-
-	switch (action_code) {
-	case FT_FAST_BSS_TRNST_REQ:
-		frm_type = MGMT_ACTION_FT_REQUEST;
-		break;
-	case FT_FAST_BSS_TRNST_RES:
-		frm_type = MGMT_ACTION_FT_RESPONSE;
-		break;
-	case FT_FAST_BSS_TRNST_CONFIRM:
-		frm_type = MGMT_ACTION_FT_CONFIRM;
-		break;
-	case FT_FAST_BSS_TRNST_ACK:
-		frm_type = MGMT_ACTION_FT_ACK;
-		break;
-	default:
-		frm_type = MGMT_FRM_UNSPECIFIED;
-		break;
-	}
-
-	return frm_type;
-}
-
 /**
  * mgmt_get_ht_action_subtype() - gets ht action subtype
  * @action_code: action code
@@ -736,9 +710,6 @@ mgmt_txrx_get_action_frm_subtype(uint8_t *mpdu_data_ptr)
 		frm_type = mgmt_get_spec_mgmt_action_subtype(
 						action_hdr->action_code);
 		break;
-	case ACTION_FAST_BSS_TRNST:
-		frm_type = mgmt_get_ft_action_subtype(action_hdr->action_code);
-		break;
 	case ACTION_CATEGORY_QOS:
 		frm_type = mgmt_get_qos_action_subtype(action_hdr->action_code);
 		break;
@@ -971,9 +942,8 @@ QDF_STATUS tgt_mgmt_txrx_rx_frame_handler(
 							      wh->i_addr3);
 
 	if (!is_from_addr_valid && !is_bssid_valid) {
-		mgmt_txrx_debug_rl("from addr "QDF_MAC_ADDR_FMT" bssid addr "QDF_MAC_ADDR_FMT" both not valid, dropping them",
-				   QDF_MAC_ADDR_REF(wh->i_addr2),
-				   QDF_MAC_ADDR_REF(wh->i_addr3));
+		mgmt_txrx_debug_rl("from addr %pM bssid addr %pM both not valid, dropping them",
+				   wh->i_addr2, wh->i_addr3);
 		qdf_nbuf_free(buf);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -981,9 +951,8 @@ QDF_STATUS tgt_mgmt_txrx_rx_frame_handler(
 	if ((mgmt_subtype == MGMT_SUBTYPE_BEACON ||
 	     mgmt_subtype == MGMT_SUBTYPE_PROBE_RESP) &&
 	    !(is_from_addr_valid && is_bssid_valid)) {
-		mgmt_txrx_debug_rl("from addr "QDF_MAC_ADDR_FMT" bssid addr "QDF_MAC_ADDR_FMT" not valid, modifying them",
-				   QDF_MAC_ADDR_REF(wh->i_addr2),
-				   QDF_MAC_ADDR_REF(wh->i_addr3));
+		mgmt_txrx_debug_rl("from addr %pM bssid addr %pM not valid, modifying them",
+				   wh->i_addr2, wh->i_addr3);
 		if (!is_from_addr_valid)
 			qdf_mem_copy(wh->i_addr2, wh->i_addr3,
 				     QDF_MAC_ADDR_SIZE);
@@ -1035,9 +1004,8 @@ QDF_STATUS tgt_mgmt_txrx_rx_frame_handler(
 	if (!(mgmt_subtype == MGMT_SUBTYPE_BEACON ||
 	      mgmt_subtype == MGMT_SUBTYPE_PROBE_RESP ||
 	      mgmt_subtype == MGMT_SUBTYPE_PROBE_REQ))
-		mgmt_txrx_debug("Rcvd mgmt frame subtype %x (frame type %u) from "QDF_MAC_ADDR_FMT", seq_num = %d, rssi = %d tsf_delta: %u",
-				mgmt_subtype, frm_type,
-				QDF_MAC_ADDR_REF(wh->i_addr2),
+		mgmt_txrx_debug("Rcvd mgmt frame subtype %x (frame type %u) from %pM, seq_num = %d, rssi = %d tsf_delta: %u",
+				mgmt_subtype, frm_type, wh->i_addr2,
 				(le16toh(*(uint16_t *)wh->i_seq) >>
 				WLAN_SEQ_SEQ_SHIFT), mgmt_rx_params->rssi,
 				mgmt_rx_params->tsf_delta);

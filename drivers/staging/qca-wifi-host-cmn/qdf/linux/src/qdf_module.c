@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018, 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -42,11 +42,8 @@ MODULE_LICENSE("Dual BSD/GPL");
  *
  * Return: int
  */
-#ifndef QCA_SINGLE_WIFI_3_0
-static int __init qdf_mod_init(void)
-#else
-int qdf_mod_init(void)
-#endif
+static int __init
+qdf_mod_init(void)
 {
 	qdf_shared_print_ctrl_init();
 	qdf_debugfs_init();
@@ -59,20 +56,15 @@ int qdf_mod_init(void)
 
 	return 0;
 }
-
-#ifndef QCA_SINGLE_WIFI_3_0
 module_init(qdf_mod_init);
-#endif
+
 /**
  * qdf_mod_exit() - module remove
  *
  * Return: int
  */
-#ifndef QCA_SINGLE_WIFI_3_0
-static void __exit qdf_mod_exit(void)
-#else
-void qdf_mod_exit(void)
-#endif
+static void __exit
+qdf_mod_exit(void)
 {
 	qdf_event_list_destroy();
 	qdf_nbuf_mod_exit();
@@ -83,7 +75,5 @@ void qdf_mod_exit(void)
 	qdf_debugfs_exit();
 	qdf_shared_print_ctrl_cleanup();
 }
-
-#ifndef QCA_SINGLE_WIFI_3_0
 module_exit(qdf_mod_exit);
-#endif
+

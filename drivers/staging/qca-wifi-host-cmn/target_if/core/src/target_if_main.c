@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -78,13 +78,10 @@
 #ifdef CRYPTO_SET_KEY_CONVERGED
 #include <target_if_crypto.h>
 #endif
+
+#ifdef CMN_VDEV_MGR_TGT_IF_ENABLE
 #include <target_if_vdev_mgr_tx_ops.h>
-
-#ifdef FEATURE_COEX
-#include <target_if_coex.h>
 #endif
-
-#include <target_if_gpio.h>
 
 static struct target_if_ctx *g_target_if_ctx;
 
@@ -344,20 +341,6 @@ static inline void target_if_crypto_tx_ops_register(
 }
 #endif
 
-#ifdef FEATURE_COEX
-static QDF_STATUS
-target_if_coex_tx_ops_register(struct wlan_lmac_if_tx_ops *tx_ops)
-{
-	return target_if_coex_register_tx_ops(tx_ops);
-}
-#else
-static inline QDF_STATUS
-target_if_coex_tx_ops_register(struct wlan_lmac_if_tx_ops *tx_ops)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
 static void target_if_target_tx_ops_register(
 		struct wlan_lmac_if_tx_ops *tx_ops)
 {
@@ -382,9 +365,6 @@ static void target_if_target_tx_ops_register(
 	target_tx_ops->tgt_is_tgt_type_qca9888 =
 		target_is_tgt_type_qca9888;
 
-	target_tx_ops->tgt_is_tgt_type_adrastea =
-		target_is_tgt_type_adrastea;
-
 	target_tx_ops->tgt_get_tgt_type =
 		lmac_get_tgt_type;
 
@@ -401,11 +381,19 @@ target_if_cp_stats_tx_ops_register(struct wlan_lmac_if_tx_ops *tx_ops)
 	return target_if_cp_stats_register_tx_ops(tx_ops);
 }
 
+#ifdef CMN_VDEV_MGR_TGT_IF_ENABLE
 static QDF_STATUS
 target_if_vdev_mgr_tx_ops_register(struct wlan_lmac_if_tx_ops *tx_ops)
 {
 	return target_if_vdev_mgr_register_tx_ops(tx_ops);
 }
+#else
+static QDF_STATUS
+target_if_vdev_mgr_tx_ops_register(struct wlan_lmac_if_tx_ops *tx_ops)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 #ifdef QCA_WIFI_FTM
 static
@@ -419,20 +407,6 @@ void target_if_ftm_tx_ops_register(struct wlan_lmac_if_tx_ops *tx_ops)
 {
 }
 #endif
-
-#ifdef WLAN_FEATURE_GPIO_CFG
-static
-void target_if_gpio_tx_ops_register(struct wlan_lmac_if_tx_ops *tx_ops)
-{
-	target_if_gpio_register_tx_ops(tx_ops);
-}
-#else
-static
-void target_if_gpio_tx_ops_register(struct wlan_lmac_if_tx_ops *tx_ops)
-{
-}
-#endif
-
 static
 QDF_STATUS target_if_register_umac_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 {
@@ -474,10 +448,6 @@ QDF_STATUS target_if_register_umac_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 	target_if_crypto_tx_ops_register(tx_ops);
 
 	target_if_vdev_mgr_tx_ops_register(tx_ops);
-
-	target_if_coex_tx_ops_register(tx_ops);
-
-	target_if_gpio_tx_ops_register(tx_ops);
 
 	/* Converged UMAC components to register their TX-ops here */
 	return QDF_STATUS_SUCCESS;
@@ -607,6 +577,7 @@ QDF_STATUS target_if_free_psoc_tgt_info(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_INVAL;
 	}
 	init_deinit_chainmask_table_free(ext_param);
+	init_deinit_rf_characterization_entries_free(ext_param);
 	init_deinit_dbr_ring_cap_free(tgt_psoc_info);
 	init_deinit_spectral_scaling_params_free(tgt_psoc_info);
 
@@ -637,9 +608,4 @@ bool target_is_tgt_type_qca9984(uint32_t target_type)
 bool target_is_tgt_type_qca9888(uint32_t target_type)
 {
 	return target_type == TARGET_TYPE_QCA9888;
-}
-
-bool target_is_tgt_type_adrastea(uint32_t target_type)
-{
-	return target_type == TARGET_TYPE_ADRASTEA;
 }

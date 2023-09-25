@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -49,7 +49,7 @@ static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 	struct wlan_objmgr_psoc *psoc;
 	struct target_psoc_info *tgt_hdl;
 	wmi_legacy_service_ready_callback legacy_callback;
-	struct wmi_unified *wmi_handle;
+	struct common_wmi_handle *wmi_handle;
 	QDF_STATUS ret_val;
 
 	if (!scn_handle) {
@@ -63,7 +63,8 @@ static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 		return -EINVAL;
 	}
 
-	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	tgt_hdl = (struct target_psoc_info *)wlan_psoc_get_tgt_if_handle(
+						psoc);
 	if (!tgt_hdl) {
 		target_if_err("target_psoc_info is null in service ready ev");
 		return -EINVAL;
@@ -123,18 +124,6 @@ static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 	if (wmi_service_enabled(wmi_handle, wmi_service_infra_mbssid))
 		wlan_psoc_nif_fw_ext_cap_set(psoc, WLAN_SOC_CEXT_MBSS_IE);
 
-	if (wmi_service_enabled(wmi_handle, wmi_service_dynamic_hw_mode))
-		wlan_psoc_nif_fw_ext_cap_set(psoc, WLAN_SOC_CEXT_DYNAMIC_HW_MODE);
-
-	if (wmi_service_enabled(wmi_handle, wmi_service_bw_165mhz_support))
-		wlan_psoc_nif_fw_ext_cap_set(psoc,
-					     WLAN_SOC_RESTRICTED_80P80_SUPPORT);
-
-	if (wmi_service_enabled(wmi_handle,
-				wmi_service_nss_ratio_to_host_support))
-		wlan_psoc_nif_fw_ext_cap_set(
-				psoc, WLAN_SOC_NSS_RATIO_TO_HOST_SUPPORT);
-
 	target_if_debug(" TT support %d, Wide BW Scan %d, SW cal %d",
 		wlan_psoc_nif_fw_ext_cap_get(psoc, WLAN_SOC_CEXT_TT_SUPPORT),
 		wlan_psoc_nif_fw_ext_cap_get(psoc, WLAN_SOC_CEXT_WIDEBAND_SCAN),
@@ -156,10 +145,6 @@ static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 		target_if_qwrap_cfg_enable(psoc, tgt_hdl, event);
 
 	target_if_lteu_cfg_enable(psoc, tgt_hdl, event);
-
-	if (wmi_service_enabled(wmi_handle, wmi_service_rx_fse_support))
-		wlan_psoc_nif_fw_ext_cap_set(psoc,
-					     WLAN_SOC_CEXT_RX_FSE_SUPPORT);
 
 	/* override derived value, if it exceeds max peer count */
 	if ((wlan_psoc_get_max_peer_count(psoc) >
@@ -216,7 +201,7 @@ static int init_deinit_service_ext2_ready_event_handler(ol_scn_t scn_handle,
 	int err_code = 0;
 	struct wlan_objmgr_psoc *psoc;
 	struct target_psoc_info *tgt_hdl;
-	struct wmi_unified *wmi_handle;
+	struct common_wmi_handle *wmi_handle;
 	struct tgt_info *info;
 
 	if (!scn_handle) {
@@ -244,15 +229,6 @@ static int init_deinit_service_ext2_ready_event_handler(ol_scn_t scn_handle,
 	if (err_code)
 		goto exit;
 
-	/* dbr_ring_caps could have already come as part of EXT event */
-	if (info->service_ext2_param.num_dbr_ring_caps) {
-		err_code = init_deinit_populate_dbr_ring_cap_ext2(psoc,
-								  wmi_handle,
-								  event, info);
-		if (err_code)
-			goto exit;
-	}
-
 	/* send init command */
 	init_deinit_set_send_init_cmd(psoc, tgt_hdl);
 
@@ -265,10 +241,9 @@ static int init_deinit_service_ext_ready_event_handler(ol_scn_t scn_handle,
 						uint32_t data_len)
 {
 	int err_code;
-	uint8_t num_radios;
 	struct wlan_objmgr_psoc *psoc;
 	struct target_psoc_info *tgt_hdl;
-	struct wmi_unified *wmi_handle;
+	struct common_wmi_handle *wmi_handle;
 	struct tgt_info *info;
 	wmi_legacy_service_ready_callback legacy_callback;
 
@@ -283,7 +258,8 @@ static int init_deinit_service_ext_ready_event_handler(ol_scn_t scn_handle,
 		return -EINVAL;
 	}
 
-	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	tgt_hdl = (struct target_psoc_info *)wlan_psoc_get_tgt_if_handle(
+						psoc);
 	if (!tgt_hdl) {
 		target_if_err("target_psoc_info is null in service ready ev");
 		return -EINVAL;
@@ -310,11 +286,20 @@ static int init_deinit_service_ext_ready_event_handler(ol_scn_t scn_handle,
 		return -EINVAL;
 	}
 
-	num_radios = target_psoc_get_num_radios_for_mode(tgt_hdl,
-							 info->preferred_hw_mode);
+	if (info->preferred_hw_mode != WMI_HOST_HW_MODE_MAX) {
+		struct wlan_psoc_host_hw_mode_caps *hw_cap = &info->hw_mode_cap;
+		/* prune info mac_phy cap to preferred/selected mode caps */
+		info->total_mac_phy_cnt = 0;
+		err_code = init_deinit_populate_mac_phy_capability(wmi_handle,
+								   event,
+								   hw_cap,
+								   info);
+		if (err_code)
+			goto exit;
 
-	/* set number of radios based on current mode */
-	target_psoc_set_num_radios(tgt_hdl, num_radios);
+		info->num_radios = info->total_mac_phy_cnt;
+		target_if_debug("num radios is %d\n", info->num_radios);
+	}
 
 	target_if_print_service_ready_ext_param(psoc, tgt_hdl);
 
@@ -335,13 +320,17 @@ static int init_deinit_service_ext_ready_event_handler(ol_scn_t scn_handle,
 			goto exit;
 	}
 
-	/* dbr_ring_caps can be absent if enough space is not available */
-	if (info->service_ext_param.num_dbr_ring_caps) {
-		err_code = init_deinit_populate_dbr_ring_cap(psoc, wmi_handle,
-							     event, info);
-		if (err_code)
-			goto exit;
-	}
+	err_code = init_deinit_populate_rf_characterization_entries(
+						wmi_handle,
+						event,
+						&info->service_ext_param);
+	if (err_code)
+		goto exit;
+
+	err_code = init_deinit_populate_dbr_ring_cap(psoc, wmi_handle,
+						event, info);
+	if (err_code)
+		goto exit;
 
 	err_code = init_deinit_populate_spectral_bin_scale_params(psoc,
 								  wmi_handle,
@@ -358,6 +347,11 @@ static int init_deinit_service_ext_ready_event_handler(ol_scn_t scn_handle,
 
 	target_if_set_twt_ap_pdev_count(info, tgt_hdl);
 
+	info->wlan_res_cfg.num_vdevs = (target_psoc_get_num_radios(tgt_hdl) *
+					info->wlan_res_cfg.num_vdevs);
+	info->wlan_res_cfg.beacon_tx_offload_max_vdev =
+				(target_psoc_get_num_radios(tgt_hdl) *
+				info->wlan_res_cfg.beacon_tx_offload_max_vdev);
 	info->wlan_res_cfg.max_bssid_indicator =
 				info->service_ext_param.max_bssid_indicator;
 
@@ -378,7 +372,7 @@ static int init_deinit_service_available_handler(ol_scn_t scn_handle,
 {
 	struct wlan_objmgr_psoc *psoc;
 	struct target_psoc_info *tgt_hdl;
-	struct wmi_unified *wmi_handle;
+	struct common_wmi_handle *wmi_handle;
 
 	if (!scn_handle) {
 		target_if_err("scn handle NULL");
@@ -391,7 +385,8 @@ static int init_deinit_service_available_handler(ol_scn_t scn_handle,
 		return -EINVAL;
 	}
 
-	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	tgt_hdl = (struct target_psoc_info *)wlan_psoc_get_tgt_if_handle(
+						psoc);
 	if (!tgt_hdl) {
 		target_if_err("target_psoc_info is null");
 		return -EINVAL;
@@ -418,7 +413,7 @@ static int init_deinit_ready_event_handler(ol_scn_t scn_handle,
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
 	struct target_psoc_info *tgt_hdl;
-	struct wmi_unified *wmi_handle;
+	struct common_wmi_handle *wmi_handle;
 	struct wmi_host_fw_abi_ver fw_ver;
 	uint8_t myaddr[QDF_MAC_ADDR_SIZE];
 	struct tgt_info *info;
@@ -440,7 +435,8 @@ static int init_deinit_ready_event_handler(ol_scn_t scn_handle,
 		return -EINVAL;
 	}
 
-	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	tgt_hdl = (struct target_psoc_info *)wlan_psoc_get_tgt_if_handle(
+						psoc);
 	if (!tgt_hdl) {
 		target_if_err("target_psoc_info is null");
 		return -EINVAL;
@@ -471,26 +467,8 @@ static int init_deinit_ready_event_handler(ol_scn_t scn_handle,
 	else
 		info->wlan_res_cfg.agile_capability = ready_ev.agile_capability;
 
-	/* Indicate to the waiting thread that the ready
-	 * event was received
-	 */
-	info->wlan_init_status = wmi_ready_extract_init_status(
-						wmi_handle, event);
-
-	legacy_callback = target_if_get_psoc_legacy_service_ready_cb();
-	if (legacy_callback)
-		if (legacy_callback(wmi_ready_event_id,
-				    scn_handle, event, data_len)) {
-			target_if_err("Legacy callback returned error!");
-			tgt_hdl->info.wmi_ready = FALSE;
-			goto exit;
-		}
-
-	num_radios = target_psoc_get_num_radios(tgt_hdl);
-
 	if ((ready_ev.num_total_peer != 0) &&
 	    (info->wlan_res_cfg.num_peers != ready_ev.num_total_peer)) {
-		uint16_t num_peers = 0;
 		/* FW allocated number of peers is different than host
 		 * requested. Update host max with FW reported value.
 		 */
@@ -498,22 +476,6 @@ static int init_deinit_ready_event_handler(ol_scn_t scn_handle,
 			       info->wlan_res_cfg.num_peers,
 			       ready_ev.num_total_peer);
 		info->wlan_res_cfg.num_peers = ready_ev.num_total_peer;
-		num_peers = info->wlan_res_cfg.num_peers / num_radios;
-
-		for (i = 0; i < num_radios; i++) {
-			pdev = wlan_objmgr_get_pdev_by_id(psoc, i,
-							  WLAN_INIT_DEINIT_ID);
-			if (!pdev) {
-				target_if_err(" PDEV %d is NULL", i);
-				return -EINVAL;
-			}
-
-			wlan_pdev_set_max_peer_count(pdev, num_peers);
-			wlan_objmgr_pdev_release_ref(pdev, WLAN_INIT_DEINIT_ID);
-		}
-
-		wlan_psoc_set_max_peer_count(psoc,
-					     info->wlan_res_cfg.num_peers);
 	}
 
 	/* for non legacy  num_total_peer will be non zero
@@ -533,22 +495,22 @@ static int init_deinit_ready_event_handler(ol_scn_t scn_handle,
 		}
 	}
 
+	/* Indicate to the waiting thread that the ready
+	 * event was received
+	 */
+	info->wlan_init_status = wmi_ready_extract_init_status(
+						wmi_handle, event);
 
-	if (ready_ev.pktlog_defs_checksum) {
-		for (i = 0; i < num_radios; i++) {
-			pdev = wlan_objmgr_get_pdev_by_id(psoc, i,
-							  WLAN_INIT_DEINIT_ID);
-			if (!pdev) {
-				target_if_err(" PDEV %d is NULL", i);
-				return -EINVAL;
-			}
-			target_if_set_pktlog_checksum(pdev, tgt_hdl,
-						      ready_ev.
-						      pktlog_defs_checksum);
-			wlan_objmgr_pdev_release_ref(pdev, WLAN_INIT_DEINIT_ID);
+	legacy_callback = target_if_get_psoc_legacy_service_ready_cb();
+	if (legacy_callback)
+		if (legacy_callback(wmi_ready_event_id,
+				    scn_handle, event, data_len)) {
+			target_if_err("Legacy callback returned error!");
+			tgt_hdl->info.wmi_ready = FALSE;
+			goto exit;
 		}
-	}
 
+	num_radios = target_psoc_get_num_radios(tgt_hdl);
 	/*
 	 * For non-legacy HW, MAC addr list is extracted.
 	 */
@@ -625,7 +587,8 @@ QDF_STATUS init_deinit_register_tgt_psoc_ev_handlers(
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	tgt_hdl = (struct target_psoc_info *)wlan_psoc_get_tgt_if_handle(
+						psoc);
 	if (!tgt_hdl) {
 		target_if_err("target_psoc_info null in register wmi hadler");
 		return QDF_STATUS_E_FAILURE;

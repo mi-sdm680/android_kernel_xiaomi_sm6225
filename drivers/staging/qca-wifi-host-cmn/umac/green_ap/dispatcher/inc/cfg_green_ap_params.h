@@ -43,7 +43,7 @@
 
 #define CFG_ENABLE_GREEN_AP_FEATURE CFG_INI_BOOL( \
 		"gEnableGreenAp", \
-		PLATFORM_VALUE(1, 0), \
+		MCL_OR_WIN_VALUE(1, 0), \
 		"enable green ap")
 
 /*
@@ -66,7 +66,7 @@
 
 #define CFG_ENABLE_EGAP_FEATURE CFG_INI_BOOL( \
 		"gEnableEGAP", \
-		PLATFORM_VALUE(1, 0), \
+		MCL_OR_WIN_VALUE(1,0), \
 		"enable e-gap")
 /*
  * <ini>

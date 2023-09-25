@@ -119,8 +119,6 @@ spectral_register_legacy_cb(struct wlan_objmgr_psoc *psoc,
 
 	sc->legacy_cbacks.vdev_get_chan_freq =
 	    legacy_cbacks->vdev_get_chan_freq;
-	sc->legacy_cbacks.vdev_get_chan_freq_seg2 =
-	    legacy_cbacks->vdev_get_chan_freq_seg2;
 	sc->legacy_cbacks.vdev_get_ch_width = legacy_cbacks->vdev_get_ch_width;
 	sc->legacy_cbacks.vdev_get_sec20chan_freq_mhz =
 	    legacy_cbacks->vdev_get_sec20chan_freq_mhz;
@@ -140,31 +138,7 @@ spectral_vdev_get_chan_freq(struct wlan_objmgr_vdev *vdev)
 		return -EINVAL;
 	}
 
-	if (!sc->legacy_cbacks.vdev_get_chan_freq) {
-		spectral_err("vdev_get_chan_freq is not supported");
-		return -ENOTSUPP;
-	}
-
 	return sc->legacy_cbacks.vdev_get_chan_freq(vdev);
-}
-
-int16_t
-spectral_vdev_get_chan_freq_seg2(struct wlan_objmgr_vdev *vdev)
-{
-	struct spectral_context *sc;
-
-	sc = spectral_get_spectral_ctx_from_vdev(vdev);
-	if (!sc) {
-		spectral_err("spectral context is null");
-		return -EINVAL;
-	}
-
-	if (!sc->legacy_cbacks.vdev_get_chan_freq_seg2) {
-		spectral_err("vdev_get_chan_freq_seg2 is not supported");
-		return -ENOTSUPP;
-	}
-
-	return sc->legacy_cbacks.vdev_get_chan_freq_seg2(vdev);
 }
 
 enum phy_ch_width
@@ -176,11 +150,6 @@ spectral_vdev_get_ch_width(struct wlan_objmgr_vdev *vdev)
 	if (!sc) {
 		spectral_err("spectral context is Null");
 		return CH_WIDTH_INVALID;
-	}
-
-	if (!sc->legacy_cbacks.vdev_get_ch_width) {
-		spectral_err("vdev_get_ch_width is not supported");
-		return -ENOTSUPP;
 	}
 
 	return sc->legacy_cbacks.vdev_get_ch_width(vdev);
@@ -198,11 +167,6 @@ spectral_vdev_get_sec20chan_freq_mhz(struct wlan_objmgr_vdev *vdev,
 		return -EINVAL;
 	}
 
-	if (!sc->legacy_cbacks.vdev_get_sec20chan_freq_mhz) {
-		spectral_err("vdev_get_sec20chan_freq_mhz is not supported");
-		return -ENOTSUPP;
-	}
-
 	return sc->legacy_cbacks.vdev_get_sec20chan_freq_mhz(vdev,
 							     sec20chan_freq);
 }
@@ -215,8 +179,6 @@ wlan_lmac_if_sptrl_register_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
 	/* Spectral rx ops */
 	sptrl_rx_ops->sptrlro_get_target_handle = tgt_get_target_handle;
 	sptrl_rx_ops->sptrlro_vdev_get_chan_freq = spectral_vdev_get_chan_freq;
-	sptrl_rx_ops->sptrlro_vdev_get_chan_freq_seg2 =
-					spectral_vdev_get_chan_freq_seg2;
 	sptrl_rx_ops->sptrlro_vdev_get_ch_width = spectral_vdev_get_ch_width;
 	sptrl_rx_ops->sptrlro_vdev_get_sec20chan_freq_mhz =
 	    spectral_vdev_get_sec20chan_freq_mhz;
@@ -269,18 +231,12 @@ bool spectral_dbr_event_handler(struct wlan_objmgr_pdev *pdev,
 
 QDF_STATUS spectral_pdev_open(struct wlan_objmgr_pdev *pdev)
 {
-	struct wlan_objmgr_psoc *psoc;
 	QDF_STATUS status;
 
-	psoc = wlan_pdev_get_psoc(pdev);
-
-	if (wlan_spectral_is_feature_disabled(psoc)) {
+	if (wlan_spectral_is_feature_disabled(wlan_pdev_get_psoc(pdev))) {
 		spectral_info("Spectral is disabled");
 		return QDF_STATUS_COMP_DISABLED;
 	}
-
-	if (cfg_get(psoc, CFG_SPECTRAL_POISON_BUFS))
-		tgt_set_spectral_dma_debug(pdev, SPECTRAL_DMA_BUFFER_DEBUG, 1);
 
 	status = tgt_spectral_register_to_dbr(pdev);
 	return QDF_STATUS_SUCCESS;

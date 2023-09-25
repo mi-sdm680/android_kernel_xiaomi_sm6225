@@ -32,7 +32,6 @@
 #include "reg_services_common.h"
 #include "reg_build_chan_list.h"
 #include "reg_host_11d.h"
-#include "reg_callbacks.h"
 
 struct wlan_regulatory_psoc_priv_obj *reg_get_psoc_obj(
 		struct wlan_objmgr_psoc *psoc)
@@ -82,8 +81,7 @@ QDF_STATUS wlan_regulatory_psoc_obj_created_notification(
 	soc_reg_obj->offload_enabled = false;
 	soc_reg_obj->psoc_ptr = psoc;
 	soc_reg_obj->dfs_enabled = true;
-	soc_reg_obj->band_capability = (BIT(REG_BAND_2G) | BIT(REG_BAND_5G) |
-					BIT(REG_BAND_6G));
+	soc_reg_obj->band_capability = BAND_ALL;
 	soc_reg_obj->enable_11d_supp = false;
 	soc_reg_obj->indoor_chan_enabled = true;
 	soc_reg_obj->force_ssc_disable_indoor_channel = false;
@@ -91,9 +89,8 @@ QDF_STATUS wlan_regulatory_psoc_obj_created_notification(
 	soc_reg_obj->vdev_cnt_11d = 0;
 	soc_reg_obj->vdev_id_for_11d_scan = INVALID_VDEV_ID;
 	soc_reg_obj->restart_beaconing = CH_AVOID_RULE_RESTART;
-	soc_reg_obj->enable_srd_chan_in_master_mode = 0xFF;
+	soc_reg_obj->enable_srd_chan_in_master_mode = true;
 	soc_reg_obj->enable_11d_in_world_mode = false;
-	soc_reg_obj->retain_nol_across_regdmn_update = false;
 
 	for (i = 0; i < MAX_STA_VDEV_CNT; i++)
 		soc_reg_obj->vdev_ids_11d[i] = INVALID_VDEV_ID;
@@ -103,7 +100,6 @@ QDF_STATUS wlan_regulatory_psoc_obj_created_notification(
 	for (pdev_cnt = 0; pdev_cnt < PSOC_MAX_PHY_REG_CAP; pdev_cnt++) {
 		mas_chan_list =
 			soc_reg_obj->mas_chan_params[pdev_cnt].mas_chan_list;
-		soc_reg_obj->chan_list_recvd[pdev_cnt] = false;
 
 		for (chan_enum = 0; chan_enum < NUM_CHANNELS; chan_enum++) {
 			mas_chan_list[chan_enum].chan_flags |=
@@ -156,25 +152,6 @@ QDF_STATUS wlan_regulatory_psoc_obj_destroyed_notification(
 	return status;
 }
 
-#ifdef DISABLE_UNII_SHARED_BANDS
-/**
- * reg_reset_unii_5g_bitmap() - Reset the value of unii_5g_bitmap.
- * @pdev_priv_obj: pointer to wlan_regulatory_pdev_priv_obj.
- *
- * Return : void
- */
-static void
-reg_reset_unii_5g_bitmap(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
-{
-	pdev_priv_obj->unii_5g_bitmap = 0x0;
-}
-#else
-static void inline
-reg_reset_unii_5g_bitmap(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
-{
-}
-#endif
-
 QDF_STATUS wlan_regulatory_pdev_obj_created_notification(
 	struct wlan_objmgr_pdev *pdev, void *arg_list)
 {
@@ -206,11 +183,10 @@ QDF_STATUS wlan_regulatory_pdev_obj_created_notification(
 	pdev_priv_obj->pdev_ptr = pdev;
 	pdev_priv_obj->dfs_enabled = psoc_priv_obj->dfs_enabled;
 	pdev_priv_obj->set_fcc_channel = false;
-	pdev_priv_obj->band_capability = psoc_priv_obj->band_capability;
+	pdev_priv_obj->band_capability =  psoc_priv_obj->band_capability;
 	pdev_priv_obj->indoor_chan_enabled =
 		psoc_priv_obj->indoor_chan_enabled;
 	pdev_priv_obj->en_chan_144 = true;
-	reg_reset_unii_5g_bitmap(pdev_priv_obj);
 
 	qdf_spinlock_create(&pdev_priv_obj->reg_rules_lock);
 
@@ -252,8 +228,6 @@ QDF_STATUS wlan_regulatory_pdev_obj_created_notification(
 
 	psoc_reg_rules = &psoc_priv_obj->mas_chan_params[pdev_id].reg_rules;
 	reg_save_reg_rules_to_pdev(psoc_reg_rules, pdev_priv_obj);
-	pdev_priv_obj->chan_list_recvd =
-		psoc_priv_obj->chan_list_recvd[pdev_id];
 
 	status = wlan_objmgr_pdev_component_obj_attach(
 			pdev, WLAN_UMAC_COMP_REGULATORY, pdev_priv_obj,

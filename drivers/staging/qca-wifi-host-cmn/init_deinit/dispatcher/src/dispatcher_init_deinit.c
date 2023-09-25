@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -71,12 +71,6 @@
 #ifdef WLAN_CFR_ENABLE
 #include <wlan_cfr_utils_api.h>
 #endif
-
-#ifdef FEATURE_COEX
-#include <wlan_coex_utils_api.h>
-#endif
-
-#include <wlan_gpio_api.h>
 
 /**
  * DOC: This file provides various init/deinit trigger point for new
@@ -258,6 +252,12 @@ static QDF_STATUS dispatcher_regulatory_psoc_close(struct wlan_objmgr_psoc
 	return regulatory_psoc_close(psoc);
 }
 
+static QDF_STATUS dispatcher_regulatory_pdev_open(struct wlan_objmgr_pdev
+						  *pdev)
+{
+	return regulatory_pdev_open(pdev);
+}
+
 #if defined(WLAN_CONV_SPECTRAL_ENABLE) && defined(SPECTRAL_MODULIZED_ENABLE)
 QDF_STATUS dispatcher_register_spectral_pdev_open_handler(
 			spectral_pdev_open_handler handler)
@@ -290,12 +290,6 @@ static QDF_STATUS dispatcher_spectral_pdev_close(struct wlan_objmgr_pdev *pdev)
 	return QDF_STATUS_SUCCESS;
 }
 #endif
-
-static QDF_STATUS dispatcher_regulatory_pdev_open(struct wlan_objmgr_pdev
-						  *pdev)
-{
-	return regulatory_pdev_open(pdev);
-}
 
 static QDF_STATUS dispatcher_regulatory_pdev_close(struct wlan_objmgr_pdev
 						  *pdev)
@@ -418,16 +412,6 @@ static QDF_STATUS dispatcher_deinit_crypto(void)
 {
 	return wlan_crypto_deinit();
 }
-
-static QDF_STATUS dispatcher_crypto_psoc_enable(struct wlan_objmgr_psoc *psoc)
-{
-	return wlan_crypto_psoc_enable(psoc);
-}
-
-static QDF_STATUS dispatcher_crypto_psoc_disable(struct wlan_objmgr_psoc *psoc)
-{
-	return wlan_crypto_psoc_disable(psoc);
-}
 #else
 static QDF_STATUS dispatcher_init_crypto(void)
 {
@@ -435,16 +419,6 @@ static QDF_STATUS dispatcher_init_crypto(void)
 }
 
 static QDF_STATUS dispatcher_deinit_crypto(void)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static QDF_STATUS dispatcher_crypto_psoc_enable(struct wlan_objmgr_psoc *psoc)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static QDF_STATUS dispatcher_crypto_psoc_disable(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -733,50 +707,6 @@ static QDF_STATUS fd_psoc_disable(struct wlan_objmgr_psoc *psoc)
 }
 #endif /* WLAN_SUPPORT_FILS */
 
-#ifdef FEATURE_COEX
-static QDF_STATUS dispatcher_coex_init(void)
-{
-	return wlan_coex_init();
-}
-
-static QDF_STATUS dispatcher_coex_deinit(void)
-{
-	return wlan_coex_deinit();
-}
-
-static QDF_STATUS dispatcher_coex_psoc_open(struct wlan_objmgr_psoc *psoc)
-{
-	return wlan_coex_psoc_open(psoc);
-}
-
-static QDF_STATUS dispatcher_coex_psoc_close(struct wlan_objmgr_psoc *psoc)
-{
-	return wlan_coex_psoc_close(psoc);
-}
-#else
-static inline QDF_STATUS dispatcher_coex_init(void)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS dispatcher_coex_deinit(void)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-dispatcher_coex_psoc_open(struct wlan_objmgr_psoc *psoc)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-dispatcher_coex_psoc_close(struct wlan_objmgr_psoc *psoc)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* FEATURE_COEX */
-
 QDF_STATUS dispatcher_init(void)
 {
 	if (QDF_STATUS_SUCCESS != wlan_objmgr_global_obj_init())
@@ -842,12 +772,6 @@ QDF_STATUS dispatcher_init(void)
 	if (QDF_STATUS_SUCCESS != dispatcher_init_cfr())
 		goto cfr_init_fail;
 
-	if (QDF_STATUS_SUCCESS != dispatcher_coex_init())
-		goto coex_init_fail;
-
-	if (QDF_STATUS_SUCCESS != wlan_gpio_init())
-		goto gpio_init_fail;
-
 	/*
 	 * scheduler INIT has to be the last as each component's
 	 * initialization has to happen first and then at the end
@@ -859,10 +783,6 @@ QDF_STATUS dispatcher_init(void)
 	return QDF_STATUS_SUCCESS;
 
 scheduler_init_fail:
-	wlan_gpio_deinit();
-gpio_init_fail:
-	dispatcher_coex_deinit();
-coex_init_fail:
 	dispatcher_deinit_cfr();
 cfr_init_fail:
 	wlan_cmn_mlme_deinit();
@@ -915,10 +835,6 @@ QDF_STATUS dispatcher_deinit(void)
 	QDF_STATUS status;
 
 	QDF_BUG(QDF_STATUS_SUCCESS == scheduler_deinit());
-
-	QDF_BUG(QDF_STATUS_SUCCESS == wlan_gpio_deinit());
-
-	QDF_BUG(QDF_STATUS_SUCCESS == dispatcher_coex_deinit());
 
 	QDF_BUG(QDF_STATUS_SUCCESS == dispatcher_deinit_cfr());
 
@@ -1008,13 +924,8 @@ QDF_STATUS dispatcher_psoc_open(struct wlan_objmgr_psoc *psoc)
 	if (QDF_STATUS_SUCCESS != dispatcher_ftm_psoc_open(psoc))
 		goto ftm_psoc_open_fail;
 
-	if (QDF_STATUS_SUCCESS != dispatcher_coex_psoc_open(psoc))
-		goto coex_psoc_open_fail;
-
 	return QDF_STATUS_SUCCESS;
 
-coex_psoc_open_fail:
-	dispatcher_ftm_psoc_close(psoc);
 ftm_psoc_open_fail:
 	son_psoc_close(psoc);
 psoc_son_fail:
@@ -1035,8 +946,6 @@ qdf_export_symbol(dispatcher_psoc_open);
 
 QDF_STATUS dispatcher_psoc_close(struct wlan_objmgr_psoc *psoc)
 {
-	QDF_BUG(QDF_STATUS_SUCCESS == dispatcher_coex_psoc_close(psoc));
-
 	QDF_BUG(QDF_STATUS_SUCCESS == dispatcher_ftm_psoc_close(psoc));
 
 	QDF_BUG(QDF_STATUS_SUCCESS == son_psoc_close(psoc));
@@ -1084,17 +993,12 @@ QDF_STATUS dispatcher_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	if (QDF_STATUS_SUCCESS != dispatcher_dbr_psoc_enable(psoc))
 		goto dbr_psoc_enable_fail;
 
-	if (QDF_STATUS_SUCCESS != dispatcher_crypto_psoc_enable(psoc))
-		goto crypto_psoc_enable_fail;
-
 	if (QDF_STATUS_SUCCESS != wlan_mlme_psoc_enable(psoc))
 		goto mlme_psoc_enable_fail;
 
 	return QDF_STATUS_SUCCESS;
 
 mlme_psoc_enable_fail:
-	dispatcher_crypto_psoc_disable(psoc);
-crypto_psoc_enable_fail:
 	dispatcher_dbr_psoc_disable(psoc);
 dbr_psoc_enable_fail:
 	fd_psoc_disable(psoc);
@@ -1120,8 +1024,6 @@ qdf_export_symbol(dispatcher_psoc_enable);
 QDF_STATUS dispatcher_psoc_disable(struct wlan_objmgr_psoc *psoc)
 {
 	QDF_BUG(QDF_STATUS_SUCCESS == wlan_mlme_psoc_disable(psoc));
-
-	QDF_BUG(QDF_STATUS_SUCCESS == dispatcher_crypto_psoc_disable(psoc));
 
 	QDF_BUG(QDF_STATUS_SUCCESS == dispatcher_dbr_psoc_disable(psoc));
 
@@ -1176,7 +1078,6 @@ cfr_pdev_open_fail:
 spectral_pdev_open_fail:
 	dispatcher_regulatory_pdev_close(pdev);
 regulatory_pdev_open_fail:
-
 	return QDF_STATUS_E_FAILURE;
 }
 qdf_export_symbol(dispatcher_pdev_open);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -371,7 +371,7 @@ QDF_STATUS ucfg_scan_flush_results(struct wlan_objmgr_pdev *pdev,
  * ucfg_scan_filter_valid_channel() - The Public API to filter scan result
  * based on valid channel list
  * @pdev: pdev object
- * @chan_freq_list: valid channel frequency (in MHz) list
+ * @chan_list: valid channel list
  * @num_chan: number of valid channels
  *
  * The Public API to to filter scan result
@@ -380,7 +380,7 @@ QDF_STATUS ucfg_scan_flush_results(struct wlan_objmgr_pdev *pdev,
  * Return: void.
  */
 void ucfg_scan_filter_valid_channel(struct wlan_objmgr_pdev *pdev,
-	uint32_t *chan_freq_list, uint32_t num_chan);
+	uint8_t *chan_list, uint32_t num_chan);
 
 /**
  * ucfg_scan_db_iterate() - function to iterate scan table
@@ -954,16 +954,6 @@ ucfg_scan_get_max_sched_scan_plan_interval(struct wlan_objmgr_psoc *psoc);
 uint32_t
 ucfg_scan_get_max_sched_scan_plan_iterations(struct wlan_objmgr_psoc *psoc);
 
-/**
- * ucfg_scan_get_user_config_sched_scan_plan() - API to get user config sched
- * scan plan configuration value
- * @psoc: pointer to psoc object
- *
- * Return: value.
- */
-bool
-ucfg_scan_get_user_config_sched_scan_plan(struct wlan_objmgr_psoc *psoc);
-
 #else
 static inline
 bool ucfg_scan_is_pno_offload_enabled(struct wlan_objmgr_psoc *psoc)
@@ -1016,12 +1006,6 @@ static inline uint32_t
 ucfg_scan_get_max_sched_scan_plan_iterations(struct wlan_objmgr_psoc *psoc)
 {
 	return 0;
-}
-
-static inline bool
-ucfg_scan_get_user_config_sched_scan_plan(struct wlan_objmgr_psoc *psoc)
-{
-	return true;
 }
 
 #endif /* FEATURE_WLAN_SCAN_PNO */

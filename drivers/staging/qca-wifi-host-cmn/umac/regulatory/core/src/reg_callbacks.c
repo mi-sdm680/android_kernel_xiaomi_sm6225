@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -211,11 +211,6 @@ QDF_STATUS reg_send_scheduler_msg_sb(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (!pdev_priv_obj->chan_list_recvd) {
-		reg_err("Empty channel list");
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	status = wlan_objmgr_psoc_try_get_ref(psoc, WLAN_REGULATORY_SB_ID);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		reg_err("error taking psoc ref cnt");
@@ -269,11 +264,6 @@ QDF_STATUS reg_send_scheduler_msg_nb(struct wlan_objmgr_psoc *psoc,
 
 	if (!pdev_priv_obj->pdev_opened) {
 		reg_err("hlos not initialized");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (!pdev_priv_obj->chan_list_recvd) {
-		reg_err("Empty channel list");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -346,6 +336,7 @@ QDF_STATUS reg_notify_sap_event(struct wlan_objmgr_pdev *pdev,
 		return QDF_STATUS_SUCCESS;
 
 	pdev_priv_obj->sap_state = sap_state;
+	set_disable_channel_state(pdev_priv_obj);
 
 	reg_compute_pdev_current_chan_list(pdev_priv_obj);
 	status = reg_send_scheduler_msg_sb(psoc, pdev);

@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -27,7 +26,6 @@
 #include "wlan_policy_mgr_api.h"
 #endif
 #include "wlan_reg_services_api.h"
-#include "wlan_crypto_global_api.h"
 
 #define SCM_20MHZ_BW_INDEX                  0
 #define SCM_40MHZ_BW_INDEX                  1
@@ -118,10 +116,10 @@ void scm_validate_scoring_config(struct scoring_config *score_cfg)
 		       score_cfg->weight_cfg.channel_congestion_weightage +
 		       score_cfg->weight_cfg.oce_wan_weightage;
 
-	if (total_weight > MAX_BSS_SCORE) {
+	if (total_weight > BEST_CANDIDATE_MAX_WEIGHT) {
 
 		scm_err("total weight is greater than %d fallback to default values",
-			MAX_BSS_SCORE);
+			BEST_CANDIDATE_MAX_WEIGHT);
 
 		score_cfg->weight_cfg.rssi_weightage = RSSI_WEIGHTAGE;
 		score_cfg->weight_cfg.ht_caps_weightage =
@@ -389,7 +387,7 @@ static int32_t scm_calculate_bandwidth_score(
 
 	bw_weight_per_idx = score_config->bandwidth_weight_per_index;
 
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(entry->channel.chan_freq)) {
+	if (WLAN_CHAN_IS_2GHZ(entry->channel.chan_idx)) {
 		cbmode = score_config->cb_mode_24G;
 		if (score_config->vht_24G_cap)
 			is_vht = true;
@@ -479,13 +477,17 @@ static int32_t scm_get_congestion_pct(struct scan_cache_entry *entry)
 		 */
 		congestion = SCM_MAX_CHANNEL_UTILIZATION -
 					est_air_time_percentage;
-	} else if (entry->qbss_chan_load) {
+		if (!congestion)
+			congestion = 1;
+	} else if (util_scan_entry_qbssload(entry)) {
 		ap_load = (entry->qbss_chan_load * BEST_CANDIDATE_MAX_WEIGHT);
 		/*
 		 * Calculate ap_load in % from qbss channel load from
 		 * 0-255 range
 		 */
 		congestion = qdf_do_div(ap_load, MAX_AP_LOAD);
+		if (!congestion)
+			congestion = 1;
 	}
 
 	return congestion;
@@ -651,8 +653,7 @@ static uint32_t scm_get_sta_nss(struct wlan_objmgr_psoc *psoc,
 	 * NSS as 2*2.
 	 */
 
-	if (policy_mgr_is_chnl_in_diff_band(
-	    psoc, wlan_chan_to_freq(bss_channel)) &&
+	if (policy_mgr_is_chnl_in_diff_band(psoc, bss_channel) &&
 	    policy_mgr_is_hw_dbs_capable(psoc) &&
 	    !(policy_mgr_is_hw_dbs_2x2_capable(psoc)))
 		return 1;
@@ -672,36 +673,6 @@ static uint32_t scm_get_sta_nss(struct wlan_objmgr_psoc *psoc,
 		vdev_nss_5g);
 }
 #endif
-
-/**
- * scm_calculate_sae_pk_ap_weightage() - Calculate SAE-PK AP weightage
- * @entry: bss entry
- * @score_params: bss score params
- * @sae_pk_cap_present: sae_pk cap presetn in RSNXE capability field
- *
- * Return: SAE-PK AP weightage score
- */
-static uint32_t
-scm_calculate_sae_pk_ap_weightage(struct scan_cache_entry *entry,
-				  struct scoring_config *score_params,
-				  bool *sae_pk_cap_present)
-{
-	uint8_t *rsnxe_ie, *rsnxe_cap, cap_len;
-
-	rsnxe_ie = util_scan_entry_rsnxe(entry);
-
-	rsnxe_cap = wlan_crypto_parse_rsnxe_ie(rsnxe_ie, &cap_len);
-
-	if (!rsnxe_cap)
-		return 0;
-
-	*sae_pk_cap_present = *rsnxe_cap & WLAN_CRYPTO_RSNX_CAP_SAE_PK;
-	if (*sae_pk_cap_present)
-		return score_params->weight_cfg.sae_pk_ap_weightage *
-			MAX_INDEX_SCORE;
-
-	return 0;
-}
 
 int scm_calculate_bss_score(struct wlan_objmgr_psoc *psoc,
 		struct scan_default_params *params,
@@ -727,14 +698,11 @@ int scm_calculate_bss_score(struct wlan_objmgr_psoc *psoc,
 	int8_t rssi_pref_5g_rssi_thresh;
 	bool same_bucket = false;
 	bool ap_su_beam_former = false;
-	uint32_t sae_pk_score = 0;
-	bool sae_pk_cap_present = 0;
 	struct wlan_ie_vhtcaps *vht_cap;
 	struct scoring_config *score_config;
 	struct weight_config *weight_config;
 	struct wlan_scan_obj *scan_obj;
 	uint32_t sta_nss;
-	struct wlan_objmgr_pdev *pdev = NULL;
 
 	scan_obj = wlan_psoc_get_scan_obj(psoc);
 	if (!scan_obj) {
@@ -762,7 +730,7 @@ int scm_calculate_bss_score(struct wlan_objmgr_psoc *psoc,
 				weight_config->ht_caps_weightage;
 	score += ht_score;
 
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(entry->channel.chan_freq)) {
+	if (WLAN_CHAN_IS_2GHZ(entry->channel.chan_idx)) {
 		if (score_config->vht_24G_cap)
 			is_vht = true;
 	} else if (score_config->vht_cap) {
@@ -819,14 +787,13 @@ int scm_calculate_bss_score(struct wlan_objmgr_psoc *psoc,
 		 */
 		if ((entry->rssi_raw > rssi_pref_5g_rssi_thresh) &&
 		    !same_bucket) {
-			if (WLAN_REG_IS_5GHZ_CH_FREQ(entry->channel.chan_freq))
+			if (WLAN_CHAN_IS_5GHZ(entry->channel.chan_idx))
 				band_score =
 					weight_config->chan_band_weightage *
 					    WLAN_GET_SCORE_PERCENTAGE(
 					    score_config->band_weight_per_index,
 					    SCM_BAND_5G_INDEX);
-		} else if (WLAN_REG_IS_24GHZ_CH_FREQ(
-						entry->channel.chan_freq)) {
+		} else if (WLAN_CHAN_IS_2GHZ(entry->channel.chan_idx)) {
 			band_score = weight_config->chan_band_weightage *
 					WLAN_GET_SCORE_PERCENTAGE(
 					score_config->band_weight_per_index,
@@ -839,24 +806,10 @@ int scm_calculate_bss_score(struct wlan_objmgr_psoc *psoc,
 		score += oce_wan_score;
 	}
 
-	sae_pk_score = scm_calculate_sae_pk_ap_weightage(entry, score_config,
-							&sae_pk_cap_present);
-	score += sae_pk_score;
-
-	pdev = wlan_objmgr_get_pdev_by_id(psoc, entry->pdev_id, WLAN_SCAN_ID);
-	if (!pdev) {
-		scm_err("pdev is NULL");
-		return 0;
-	}
-
-	sta_nss = scm_get_sta_nss(psoc,
-				  wlan_reg_freq_to_chan(
-						pdev,
-						entry->channel.chan_freq),
+	sta_nss = scm_get_sta_nss(psoc, entry->channel.chan_idx,
 				  score_config->vdev_nss_24g,
 				  score_config->vdev_nss_5g);
 
-	wlan_objmgr_pdev_release_ref(pdev, WLAN_SCAN_ID);
 	/*
 	 * If station support nss as 2*2 but AP support NSS as 1*1,
 	 * this AP will be given half weight compare to AP which are having
@@ -872,30 +825,28 @@ int scm_calculate_bss_score(struct wlan_objmgr_psoc *psoc,
 		       score_config->beamformee_cap, score_config->cb_mode_24G,
 		       score_config->cb_mode_5G, sta_nss);
 
-	scm_nofl_debug("Candidate("QDF_MAC_ADDR_FMT" freq %d): rssi %d HT %d VHT %d HE %d su bfer %d phy %d  air time frac %d qbss %d cong_pct %d NSS %d sae_pk_cap_present %d",
-		       QDF_MAC_ADDR_REF(entry->bssid.bytes),
-		       entry->channel.chan_freq,
+	scm_nofl_debug("Candidate(%pM chan %d): rssi %d HT %d VHT %d HE %d su bfer %d phy %d  air time frac %d qbss %d cong_pct %d NSS %d",
+		       entry->bssid.bytes, entry->channel.chan_idx,
 		       entry->rssi_raw, util_scan_entry_htcap(entry) ? 1 : 0,
 		       util_scan_entry_vhtcap(entry) ? 1 : 0,
 		       util_scan_entry_hecap(entry) ? 1 : 0, ap_su_beam_former,
 		       entry->phy_mode, entry->air_time_fraction,
-		       entry->qbss_chan_load, congestion_pct, entry->nss,
-		       sae_pk_cap_present);
+		       entry->qbss_chan_load, congestion_pct, entry->nss);
 
-	scm_nofl_debug("Scores: prorated_pcnt %d rssi %d pcl %d ht %d vht %d he %d bfee %d bw %d band %d congestion %d nss %d oce wan %d sae_pk %d TOTAL %d",
+	scm_nofl_debug("Scores: prorated_pcnt %d rssi %d pcl %d ht %d vht %d he %d bfee %d bw %d band %d congestion %d nss %d oce wan %d TOTAL %d",
 		       prorated_pcnt, rssi_score, pcl_score, ht_score,
 		       vht_score, he_score, beamformee_score, bandwidth_score,
 		       band_score, congestion_score, nss_score, oce_wan_score,
-		       sae_pk_score, score);
+		       score);
 
 	entry->bss_score = score;
 	return score;
 }
 
-bool scm_get_pcl_weight_of_channel(uint32_t chan_freq,
-				   struct scan_filter *filter,
-				   int *pcl_chan_weight,
-				   uint8_t *weight_list)
+bool scm_get_pcl_weight_of_channel(int channel_id,
+		struct scan_filter *filter,
+		int *pcl_chan_weight,
+		uint8_t *weight_list)
 {
 	int i;
 	bool found = false;
@@ -904,7 +855,7 @@ bool scm_get_pcl_weight_of_channel(uint32_t chan_freq,
 		return found;
 
 	for (i = 0; i < filter->num_of_pcl_channels; i++) {
-		if (filter->pcl_freq_list[i] == chan_freq) {
+		if (filter->pcl_channel_list[i] == channel_id) {
 			*pcl_chan_weight = filter->pcl_weight_list[i];
 			found = true;
 			break;

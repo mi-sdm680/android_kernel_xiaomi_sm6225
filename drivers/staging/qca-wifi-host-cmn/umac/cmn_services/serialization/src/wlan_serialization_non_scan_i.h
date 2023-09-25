@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -115,8 +115,6 @@ wlan_ser_remove_non_scan_cmd(struct wlan_ser_pdev_obj *ser_pdev_obj,
  * @cmd_type: Serialization command type to be cancelled
  * @is_active_queue: If the cmd has to be removed from active queue or pending
  *			queue
- * @cmd_attr: Indicate the attribute of the cmd to be cancelled
- *      i.e blocking/non-blocking
  *
  * Return: Status specifying the cancel of a command from the given queue
  */
@@ -126,6 +124,5 @@ wlan_ser_cancel_non_scan_cmd(struct wlan_ser_pdev_obj *ser_obj,
 			     struct wlan_objmgr_vdev *vdev,
 			     struct wlan_serialization_command *cmd,
 			     enum wlan_serialization_cmd_type cmd_type,
-			     uint8_t is_active_queue,
-			     enum wlan_ser_cmd_attr cmd_attr);
+			     uint8_t is_active_queue);
 #endif

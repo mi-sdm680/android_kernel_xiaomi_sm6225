@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,7 +30,6 @@
 #include <wlan_scan_public_structs.h>
 #include "wlan_scan_cache_db.h"
 #include "wlan_scan_11d.h"
-#include "wlan_scan_cfg.h"
 
 #define scm_alert(params...) \
 	QDF_TRACE_FATAL(QDF_MODULE_ID_SCAN, params)
@@ -90,9 +89,6 @@
 #define SCAN_P2P_SCAN_MAX_BURST_DURATION     (240)
 #define SCAN_GO_BURST_SCAN_MAX_NUM_OFFCHANNELS   (6)
 
-/* MAX RNR entries per channel*/
-#define WLAN_MAX_RNR_COUNT 15
-
 /**
  * struct probe_time_dwell_time - probe time, dwell time map
  * @dwell_time: dwell time
@@ -116,6 +112,19 @@ struct probe_time_dwell_time {
 #define SCM_NUM_RSSI_CAT        15
 #define SCAN_STA_MIRACAST_MCC_REST_TIME 400
 
+#ifndef CONFIG_MCL
+#define MAX_SCAN_CACHE_SIZE 1024
+#define SCAN_MAX_REST_TIME 0
+#define SCAN_MIN_REST_TIME 50
+#define SCAN_BURST_DURATION 0
+#define SCAN_PROBE_SPACING_TIME 0
+#define SCAN_PROBE_DELAY 0
+#define SCAN_MAX_SCAN_TIME 50000
+#define SCAN_NETWORK_IDLE_TIMEOUT 200
+#define HIDDEN_SSID_TIME (0xFFFFFFFF)
+#define SCAN_CHAN_STATS_EVENT_ENAB (true)
+#endif
+
 #define SCAN_TIMEOUT_GRACE_PERIOD 10
 #define SCAN_MAX_BSS_PDEV 100
 #define SCAN_PRIORITY SCAN_PRIORITY_LOW
@@ -133,21 +142,6 @@ struct probe_time_dwell_time {
  * Enable Reception of Public Action frame with this flag
  */
 #define SCAN_FLAG_EXT_FILTER_PUBLIC_ACTION_FRAME 0x4
-
-/* Indicate to scan all PSC channel */
-#define SCAN_FLAG_EXT_6GHZ_SCAN_ALL_PSC_CH 0x8
-
-/* Indicate to scan all NON-PSC channel */
-#define SCAN_FLAG_EXT_6GHZ_SCAN_ALL_NON_PSC_CH 0x10
-
-/* Indicate to save scan result matching hint from scan client */
-#define SCAN_FLAG_EXT_6GHZ_MATCH_HINT 0x20
-
-/* Skip any channel on which RNR information is not received */
-#define SCAN_FLAG_EXT_6GHZ_SKIP_NON_RNR_CH 0x40
-
-/* Indicate client hint req is high priority than FW rnr or FILS discovery */
-#define SCAN_FLAG_EXT_6GHZ_CLIENT_HIGH_PRIORITY 0x80
 
 /* Passive dwell time if bt_a2dp is enabled. Time in msecs*/
 #define PASSIVE_DWELL_TIME_BT_A2DP_ENABLED 28
@@ -244,7 +238,6 @@ struct scan_vdev_obj {
  * @pno_wake_lock: pno wake lock
  * @pno_cb: callback to call on PNO completion
  * @mawc_params: Configuration parameters for NLO MAWC.
- * @user_config_sched_scan_plan: if enabled set user confing sched scan plan
  */
 struct pno_def_config {
 	bool pno_offload_enabled;
@@ -263,11 +256,9 @@ struct pno_def_config {
 	qdf_wake_lock_t pno_wake_lock;
 	struct cb_handler pno_cb;
 	struct nlo_mawc_params mawc_params;
-	bool user_config_sched_scan_plan;
 };
 #endif
 
-#ifdef FEATURE_WLAN_EXTSCAN
 /**
  * struct extscan_def_config - def configuration for EXTSCAN
  * @extscan_enabled: enable extscan
@@ -283,7 +274,6 @@ struct extscan_def_config {
 	uint32_t extscan_active_max_chn_time;
 	uint32_t extscan_active_min_chn_time;
 };
-#endif
 
 /**
  * struct scan_default_params - default scan parameters to be used
@@ -293,8 +283,6 @@ struct extscan_def_config {
  * @skip_dfs_chan_in_p2p_search: Skip DFS channels in p2p search.
  * @use_wake_lock_in_user_scan: if wake lock will be acquired during user scan
  * @active_dwell_2g: default active dwell time for 2G channels, if it's not zero
- * @active_dwell_6g: default active dwell time for 6G channels
- * @passive_dwell_6g: default passive dwell time for 6G channels
  * @passive_dwell:default passive dwell time
  * @max_rest_time: default max rest time
  * @sta_miracast_mcc_rest_time: max rest time for miracast and mcc
@@ -320,7 +308,6 @@ struct extscan_def_config {
  * @max_bss_per_pdev: maximum number of bss entries to be maintained per pdev
  * @max_active_scans_allowed: maximum number of active parallel scan allowed
  *                            per psoc
- * @scan_mode_6g: scan mode in 6Ghz
  * @enable_connected_scan: enable scans after connection
  * @scan_priority: default scan priority
  * @adaptive_dwell_time_mode: adaptive dwell mode with connection
@@ -378,8 +365,6 @@ struct scan_default_params {
 	bool skip_dfs_chan_in_p2p_search;
 	bool use_wake_lock_in_user_scan;
 	uint32_t active_dwell_2g;
-	uint32_t active_dwell_6g;
-	uint32_t passive_dwell_6g;
 	uint32_t passive_dwell;
 	uint32_t max_rest_time;
 	uint32_t sta_miracast_mcc_rest_time;
@@ -408,7 +393,6 @@ struct scan_default_params {
 	uint8_t p2p_scan_burst_duration;
 	uint8_t go_scan_burst_duration;
 	uint8_t ap_scan_burst_duration;
-	enum scan_mode_6ghz scan_mode_6g;
 	bool enable_connected_scan;
 	enum scan_priority scan_priority;
 	enum scan_dwelltime_adaptive_mode adaptive_dwell_time_mode;
@@ -498,12 +482,8 @@ struct scan_cb {
  * @miracast_enabled: miracast enabled
  * @disable_timeout: command timeout disabled
  * @drop_bcn_on_chan_mismatch: drop bcn if channel mismatch
- * @drop_bcn_on_invalid_freq: drop bcn if freq is invalid in IEs (DS/HT/HE)
  * @scan_start_request_buff: buffer used to pass
  *      scan config to event handlers
- * @rnr_channel_db: RNR channel list database
- * @allow_bss_with_incomplete_ie: Continue scan entry even if any corrupted IES
- *  are present.
  */
 struct wlan_scan_obj {
 	uint32_t scan_disabled;
@@ -527,12 +507,7 @@ struct wlan_scan_obj {
 	bool miracast_enabled;
 	bool disable_timeout;
 	bool drop_bcn_on_chan_mismatch;
-	bool drop_bcn_on_invalid_freq;
 	struct scan_start_request scan_start_request_buff;
-#ifdef FEATURE_6G_SCAN_CHAN_SORT_ALGO
-	struct channel_list_db rnr_channel_db;
-#endif
-	bool allow_bss_with_incomplete_ie;
 };
 
 /**

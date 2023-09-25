@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -225,6 +225,7 @@ struct wmi_unified_pmk_cache {
 
 /**
  * struct aggr_add_ts_param - ADDTS parameters
+ * @staIdx: station index
  * @tspecIdx: TSPEC handler uniquely identifying a TSPEC for a STA in a BSS
  * @tspec: tspec value
  * @status: CDF status
@@ -232,6 +233,7 @@ struct wmi_unified_pmk_cache {
  * @vdev_id: vdev id
  */
 struct aggr_add_ts_param {
+	uint16_t staIdx;
 	uint16_t tspecIdx;
 	struct mac_tspec_ie tspec[WMI_QOS_NUM_AC_MAX];
 	QDF_STATUS status[WMI_QOS_NUM_AC_MAX];
@@ -270,11 +272,13 @@ struct flashing_req_params {
 	uint32_t led_x1;
 };
 
+#define MAX_NUM_CHAN 128
+
 /**
  * struct wmi_pcl_chan_weights - Params to get the valid weighed list
- * @pcl_list: channel freq list sorted in preferred order
+ * @pcl_list: Preferred channel list already sorted in the order of preference
  * @pcl_len: Length of the PCL
- * @saved_chan_list: Valid channel freq list updated as part of
+ * @saved_chan_list: Valid channel list updated as part of
  * WMA_UPDATE_CHAN_LIST_REQ
  * @saved_num_chan: Length of the valid channel list
  * @weighed_valid_list: Weights of the valid channel list. This will have one
@@ -283,12 +287,12 @@ struct flashing_req_params {
  * @weight_list: Weights assigned by policy manager
  */
 struct wmi_pcl_chan_weights {
-	uint32_t pcl_list[NUM_CHANNELS];
+	uint8_t pcl_list[MAX_NUM_CHAN];
 	uint32_t pcl_len;
-	uint32_t saved_chan_list[NUM_CHANNELS];
+	uint8_t saved_chan_list[MAX_NUM_CHAN];
 	uint32_t saved_num_chan;
-	uint8_t weighed_valid_list[NUM_CHANNELS];
-	uint8_t weight_list[NUM_CHANNELS];
+	uint8_t weighed_valid_list[MAX_NUM_CHAN];
+	uint8_t weight_list[MAX_NUM_CHAN];
 };
 
 /**

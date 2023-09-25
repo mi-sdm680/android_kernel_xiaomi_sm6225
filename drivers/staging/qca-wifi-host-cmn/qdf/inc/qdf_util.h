@@ -52,11 +52,6 @@ typedef __qdf_wait_queue_head_t qdf_wait_queue_head_t;
 #define qdf_wmb()                 __qdf_wmb()
 
 /**
- * qdf_rmb - read memory barrier.
- */
-#define qdf_rmb()                 __qdf_rmb()
-
-/**
  * qdf_mb - read + write memory barrier.
  */
 #define qdf_mb()                 __qdf_mb()
@@ -769,19 +764,6 @@ static inline
 int qdf_hex_str_to_binary(u8 *dst, const char *src, size_t count)
 {
 	return __qdf_hex_str_to_binary(dst, src, count);
-}
-
-/**
- * qdf_fls() - find last set bit in a given 32 bit input
- * @x: 32 bit mask
- *
- * Return: zero if the input is zero, otherwise returns the bit
- * position of the last set bit, where the LSB is 1 and MSB is 32.
- */
-static inline
-int qdf_fls(uint32_t x)
-{
-	return __qdf_fls(x);
 }
 
 #endif /*_QDF_UTIL_H*/

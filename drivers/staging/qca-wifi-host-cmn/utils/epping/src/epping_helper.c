@@ -127,11 +127,24 @@ void epping_get_dummy_mac_addr(tSirMacAddr macAddr)
 
 void epping_hex_dump(void *data, int buf_len, const char *str)
 {
-	EPPING_LOG(QDF_TRACE_LEVEL_FATAL, "%s: E, %s", __func__, str);
+	char *buf = (char *)data;
+	int i;
 
-	EPPING_HEX_DUMP(QDF_TRACE_LEVEL_INFO, data, buf_len);
+	printk("%s: E, %s\n", __func__, str);
+	for (i = 0; (i + 7) < buf_len; i += 8) {
+		printk("%02x %02x %02x %02x %02x %02x %02x %02x\n",
+		       buf[i],
+		       buf[i + 1],
+		       buf[i + 2],
+		       buf[i + 3],
+		       buf[i + 4], buf[i + 5], buf[i + 6], buf[i + 7]);
+	}
 
-	EPPING_LOG(QDF_TRACE_LEVEL_FATAL, "%s: X %s", __func__, str);
+	/* Dump the bytes in the last line */
+	for (; i < buf_len; i++) {
+		printk("%02x ", buf[i]);
+	}
+	printk("\n%s: X %s\n", __func__, str);
 }
 
 void *epping_get_qdf_ctx(void)

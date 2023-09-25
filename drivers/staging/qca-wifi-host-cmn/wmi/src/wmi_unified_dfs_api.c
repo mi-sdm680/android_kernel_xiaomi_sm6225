@@ -30,12 +30,13 @@
 #include <wmi_unified_dfs_api.h>
 #include <init_deinit_lmac.h>
 
-QDF_STATUS wmi_extract_dfs_cac_complete_event(
-		wmi_unified_t wmi_handle,
+QDF_STATUS wmi_extract_dfs_cac_complete_event(void *wmi_hdl,
 		uint8_t *evt_buf,
 		uint32_t *vdev_id,
 		uint32_t len)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
+
 	if (wmi_handle && wmi_handle->ops->extract_dfs_cac_complete_event)
 		return wmi_handle->ops->extract_dfs_cac_complete_event(
 				wmi_handle, evt_buf, vdev_id, len);
@@ -45,10 +46,12 @@ QDF_STATUS wmi_extract_dfs_cac_complete_event(
 qdf_export_symbol(wmi_extract_dfs_cac_complete_event);
 
 QDF_STATUS
-wmi_extract_dfs_ocac_complete_event(wmi_unified_t wmi_handle,
+wmi_extract_dfs_ocac_complete_event(void *wmi_hdl,
 				    uint8_t *evt_buf,
 				    struct vdev_adfs_complete_status *param)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
+
 	if (wmi_handle && wmi_handle->ops->extract_dfs_ocac_complete_event)
 		return wmi_handle->ops->extract_dfs_ocac_complete_event(
 				wmi_handle, evt_buf, param);
@@ -58,12 +61,13 @@ wmi_extract_dfs_ocac_complete_event(wmi_unified_t wmi_handle,
 
 qdf_export_symbol(wmi_extract_dfs_ocac_complete_event);
 
-QDF_STATUS wmi_extract_dfs_radar_detection_event(
-		wmi_unified_t wmi_handle,
+QDF_STATUS wmi_extract_dfs_radar_detection_event(void *wmi_hdl,
 		uint8_t *evt_buf,
 		struct radar_found_info *radar_found,
 		uint32_t len)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
+
 	if (wmi_handle && wmi_handle->ops->extract_dfs_radar_detection_event)
 		return wmi_handle->ops->extract_dfs_radar_detection_event(
 				wmi_handle, evt_buf, radar_found, len);
@@ -72,12 +76,13 @@ QDF_STATUS wmi_extract_dfs_radar_detection_event(
 }
 
 #ifdef QCA_MCL_DFS_SUPPORT
-QDF_STATUS wmi_extract_wlan_radar_event_info(
-		wmi_unified_t wmi_handle,
+QDF_STATUS wmi_extract_wlan_radar_event_info(void *wmi_hdl,
 		uint8_t *evt_buf,
 		struct radar_event_info *wlan_radar_event,
 		uint32_t len)
 {
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
+
 	if (wmi_handle->ops->extract_wlan_radar_event_info)
 		return wmi_handle->ops->extract_wlan_radar_event_info(
 				wmi_handle, evt_buf, wlan_radar_event, len);
@@ -88,11 +93,12 @@ qdf_export_symbol(wmi_extract_dfs_radar_detection_event);
 #endif
 
 #if defined(WLAN_DFS_FULL_OFFLOAD) && defined(QCA_DFS_NOL_OFFLOAD)
-QDF_STATUS wmi_send_usenol_pdev_param(wmi_unified_t wmi_handle, bool usenol,
+QDF_STATUS wmi_send_usenol_pdev_param(void *wmi_hdl, bool usenol,
 				      struct wlan_objmgr_pdev *pdev)
 {
 	struct pdev_params pparam;
 	int pdev_idx;
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
 
 	pdev_idx = lmac_get_pdev_idx(pdev);
 	if (pdev_idx < 0)
@@ -106,12 +112,13 @@ QDF_STATUS wmi_send_usenol_pdev_param(wmi_unified_t wmi_handle, bool usenol,
 }
 
 QDF_STATUS
-wmi_send_subchan_marking_pdev_param(wmi_unified_t wmi_handle,
+wmi_send_subchan_marking_pdev_param(void *wmi_hdl,
 				    bool subchanmark,
 				    struct wlan_objmgr_pdev *pdev)
 {
 	struct pdev_params pparam;
 	int pdev_idx;
+	struct wmi_unified *wmi_handle = (struct wmi_unified *)wmi_hdl;
 
 	pdev_idx = lmac_get_pdev_idx(pdev);
 	if (pdev_idx < 0)

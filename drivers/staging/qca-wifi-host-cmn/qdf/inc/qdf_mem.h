@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -27,7 +27,6 @@
 /* Include Files */
 #include <qdf_types.h>
 #include <i_qdf_mem.h>
-#include <i_qdf_trace.h>
 
 #define QDF_CACHE_LINE_SZ __qdf_cache_line_sz
 
@@ -39,7 +38,6 @@
  * Return: aligned value.
  */
 #define qdf_align(a, align_size)   __qdf_align(a, align_size)
-#define qdf_page_size __page_size
 
 /**
  * struct qdf_mem_dma_page_t - Allocated dmaable page
@@ -59,17 +57,12 @@ struct qdf_mem_dma_page_t {
  * @num_pages: Number of allocation needed pages
  * @dma_pages: page information storage in case of coherent memory
  * @cacheable_pages: page information storage in case of cacheable memory
- * @is_mem_prealloc: flag for multiple pages pre-alloc or not
  */
 struct qdf_mem_multi_page_t {
 	uint16_t num_element_per_page;
 	uint16_t num_pages;
 	struct qdf_mem_dma_page_t *dma_pages;
 	void **cacheable_pages;
-	qdf_size_t page_size;
-#ifdef DP_MEM_PRE_ALLOC
-	uint8_t is_mem_prealloc;
-#endif
 };
 
 
@@ -96,13 +89,6 @@ void qdf_mem_exit(void);
 #define QDF_MEM_FUNC_NAME_SIZE 48
 
 #ifdef MEMORY_DEBUG
-/**
- * qdf_mem_debug_config_get() - Get the user configuration of mem_debug_disabled
- *
- * Return: value of mem_debug_disabled qdf module argument
- */
-bool qdf_mem_debug_config_get(void);
-
 /**
  * qdf_mem_malloc_debug() - debug version of QDF memory allocation API
  * @size: Number of bytes of memory to allocate.
@@ -141,28 +127,6 @@ void qdf_mem_free_debug(void *ptr, const char *file, uint32_t line);
 
 #define qdf_mem_free(ptr) \
 	qdf_mem_free_debug(ptr, __func__, __LINE__)
-
-void qdf_mem_multi_pages_alloc_debug(qdf_device_t osdev,
-				     struct qdf_mem_multi_page_t *pages,
-				     size_t element_size, uint16_t element_num,
-				     qdf_dma_context_t memctxt, bool cacheable,
-				     const char *func, uint32_t line,
-				     void *caller);
-
-#define qdf_mem_multi_pages_alloc(osdev, pages, element_size, element_num,\
-				  memctxt, cacheable) \
-	qdf_mem_multi_pages_alloc_debug(osdev, pages, element_size, \
-					element_num, memctxt, cacheable, \
-					__func__, __LINE__, QDF_RET_IP)
-
-void qdf_mem_multi_pages_free_debug(qdf_device_t osdev,
-				    struct qdf_mem_multi_page_t *pages,
-				    qdf_dma_context_t memctxt, bool cacheable,
-				    const char *func, uint32_t line);
-
-#define qdf_mem_multi_pages_free(osdev, pages, memctxt, cacheable) \
-	qdf_mem_multi_pages_free_debug(osdev, pages, memctxt, cacheable, \
-				       __func__, __LINE__)
 
 /**
  * qdf_mem_check_for_leaks() - Assert that the current memory domain is empty
@@ -239,10 +203,6 @@ void qdf_mem_free_consistent_debug(qdf_device_t osdev, void *dev,
 	qdf_mem_free_consistent_debug(osdev, dev, size, vaddr, paddr, memctx, \
 				  __func__, __LINE__)
 #else
-static inline bool qdf_mem_debug_config_get(void)
-{
-	return false;
-}
 
 /**
  * qdf_mem_malloc() - allocation QDF memory
@@ -257,10 +217,9 @@ static inline bool qdf_mem_debug_config_get(void)
  * specified (for any reason) it returns NULL.
  */
 #define qdf_mem_malloc(size) \
-	__qdf_mem_malloc(size, __func__, __LINE__)
+	qdf_mem_malloc_fl(size, __func__, __LINE__)
 
-#define qdf_mem_malloc_fl(size, func, line) \
-	__qdf_mem_malloc(size, func, line)
+void *qdf_mem_malloc_fl(qdf_size_t size, const char *func, uint32_t line);
 
 /**
  * qdf_mem_malloc_atomic() - allocation QDF memory atomically
@@ -281,39 +240,24 @@ void *qdf_mem_malloc_atomic_fl(qdf_size_t size,
 			       const char *func,
 			       uint32_t line);
 
-#define qdf_mem_free(ptr) \
-	__qdf_mem_free(ptr)
-
-static inline void qdf_mem_check_for_leaks(void) { }
-
-#define qdf_mem_alloc_consistent(osdev, dev, size, paddr) \
-	__qdf_mem_alloc_consistent(osdev, dev, size, paddr, __func__, __LINE__)
-
-#define qdf_mem_free_consistent(osdev, dev, size, vaddr, paddr, memctx) \
-	__qdf_mem_free_consistent(osdev, dev, size, vaddr, paddr, memctx)
-
-void qdf_mem_multi_pages_alloc(qdf_device_t osdev,
-			       struct qdf_mem_multi_page_t *pages,
-			       size_t element_size, uint16_t element_num,
-			       qdf_dma_context_t memctxt, bool cacheable);
-
-void qdf_mem_multi_pages_free(qdf_device_t osdev,
-			      struct qdf_mem_multi_page_t *pages,
-			      qdf_dma_context_t memctxt, bool cacheable);
-
-#endif /* MEMORY_DEBUG */
-
 /**
- * qdf_mem_multi_pages_zero() - zero out each page memory
- * @pages: Multi page information storage
- * @cacheable: Coherent memory or cacheable memory
- *
- * This function will zero out each page memory
+ * qdf_mem_free() - free QDF memory
+ * @ptr: Pointer to the starting address of the memory to be freed.
  *
  * Return: None
  */
-void qdf_mem_multi_pages_zero(struct qdf_mem_multi_page_t *pages,
-			      bool cacheable);
+void qdf_mem_free(void *ptr);
+
+static inline void qdf_mem_check_for_leaks(void) { }
+
+void *qdf_mem_alloc_consistent(qdf_device_t osdev, void *dev,
+			       qdf_size_t size, qdf_dma_addr_t *paddr);
+
+void qdf_mem_free_consistent(qdf_device_t osdev, void *dev,
+			     qdf_size_t size, void *vaddr,
+			     qdf_dma_addr_t paddr, qdf_dma_context_t memctx);
+
+#endif /* MEMORY_DEBUG */
 
 /**
  * qdf_aligned_malloc() - allocates aligned QDF memory.
@@ -471,7 +415,7 @@ static inline uint32_t qdf_mem_map_nbytes_single(qdf_device_t osdev, void *buf,
 						 qdf_dma_dir_t dir, int nbytes,
 						 qdf_dma_addr_t *phy_addr)
 {
-#if defined(HIF_PCI) || defined(HIF_IPCI)
+#if defined(HIF_PCI)
 	return __qdf_mem_map_nbytes_single(osdev, buf, dir, nbytes, phy_addr);
 #else
 	return 0;
@@ -500,7 +444,7 @@ static inline void qdf_mem_unmap_nbytes_single(qdf_device_t osdev,
 					       qdf_dma_dir_t dir,
 					       int nbytes)
 {
-#if defined(HIF_PCI) || defined(HIF_IPCI)
+#if defined(HIF_PCI)
 	__qdf_mem_unmap_nbytes_single(osdev, phy_addr, dir, nbytes);
 #endif
 }
@@ -567,6 +511,13 @@ void qdf_mem_dma_sync_single_for_cpu(qdf_device_t osdev,
 					qdf_size_t size,
 					__dma_data_direction direction);
 
+void qdf_mem_multi_pages_alloc(qdf_device_t osdev,
+			       struct qdf_mem_multi_page_t *pages,
+			       size_t element_size, uint16_t element_num,
+			       qdf_dma_context_t memctxt, bool cacheable);
+void qdf_mem_multi_pages_free(qdf_device_t osdev,
+			      struct qdf_mem_multi_page_t *pages,
+			      qdf_dma_context_t memctxt, bool cacheable);
 int qdf_mem_multi_page_link(qdf_device_t osdev,
 		struct qdf_mem_multi_page_t *pages,
 		uint32_t elem_size, uint32_t elem_count, uint8_t cacheable);
@@ -646,7 +597,7 @@ static inline void qdf_update_mem_map_table(qdf_device_t osdev,
 					    uint32_t mem_size)
 {
 	if (!mem_info) {
-		qdf_nofl_err("%s: NULL mem_info", __func__);
+		__qdf_print("%s: NULL mem_info\n", __func__);
 		return;
 	}
 
@@ -843,8 +794,8 @@ static inline void qdf_mem_shared_mem_free(qdf_device_t osdev,
 					   qdf_shared_mem_t *shared_mem)
 {
 	if (!shared_mem) {
-		qdf_nofl_err("%s: NULL shared mem struct passed",
-			     __func__);
+		__qdf_print("%s: NULL shared mem struct passed\n",
+			    __func__);
 		return;
 	}
 

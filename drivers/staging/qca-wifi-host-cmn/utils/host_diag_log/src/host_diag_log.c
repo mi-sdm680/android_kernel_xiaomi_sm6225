@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -109,8 +109,12 @@ void host_diag_log_submit(void *plog_hdr_ptr)
 	uint16_t data_len;
 	uint16_t total_len;
 
-	if (cds_is_load_or_unload_in_progress())
+	if (cds_is_load_or_unload_in_progress()) {
+		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
+			  "%s: Unloading/Loading in Progress. Ignore!!!",
+			  __func__);
 		return;
+	}
 
 	if (nl_srv_is_initialized() != 0)
 		return;
@@ -197,8 +201,12 @@ void host_diag_event_report_payload(uint16_t event_Id, uint16_t length,
 	event_report_t *pEvent_report;
 	uint16_t total_len;
 
-	if (cds_is_load_or_unload_in_progress())
+	if (cds_is_load_or_unload_in_progress()) {
+		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_INFO,
+			  "%s: Unloading/Loading in Progress. Ignore!!!",
+			  __func__);
 		return;
+	}
 
 	if (nl_srv_is_initialized() != 0)
 		return;

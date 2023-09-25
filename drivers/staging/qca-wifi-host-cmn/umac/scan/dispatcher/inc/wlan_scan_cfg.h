@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -24,19 +24,6 @@
 
 #include "cfg_define.h"
 
-/**
- * enum scan_mode_6ghz - scan mode for 6GHz
- * @SCAN_MODE_6G_NO_CHANNEL: Remove 6GHz channels in the scan request
- * @SCAN_MODE_6G_PSC_CHANNEL: Allow/Add 6Ghz PSC channels to scan request
- * @SCAN_MODE_6G_ALL_CHANNEL: Allow all the 6Ghz channels
- */
-enum scan_mode_6ghz {
-	SCAN_MODE_6G_NO_CHANNEL,
-	SCAN_MODE_6G_PSC_CHANNEL,
-	SCAN_MODE_6G_ALL_CHANNEL,
-	SCAN_MODE_6G_MAX = SCAN_MODE_6G_ALL_CHANNEL,
-};
-
 /*
  * <ini>
  * drop_bcn_on_chan_mismatch - drop the beacon for chan mismatch
@@ -60,27 +47,6 @@ enum scan_mode_6ghz {
 
 /*
  * <ini>
- * drop_bcn_on_invalid_freq - drop the beacon or probe resp with invalid freq
- * @Min: 0
- * @Max: 1
- * @Default: 1
- *
- * This ini is used to decide whether to drop the beacon/probe resp or not
- * if channel received in DS param, HT info and HE IE is invalid.
- *
- * Related: None
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_DROP_BCN_ON_INVALID_FREQ CFG_INI_BOOL(\
-		"drop_bcn_on_invalid_freq",\
-		true,\
-		"drop bcn on invalid freq in HT, DS, HE IE")
-
-/*
- * <ini>
  * gActiveMaxChannelTime - Set max channel time for active scan
  * @Min: 0
  * @Max: 10000
@@ -97,7 +63,7 @@ enum scan_mode_6ghz {
  */
 #define CFG_ACTIVE_MAX_CHANNEL_TIME CFG_INI_UINT(\
 		"gActiveMaxChannelTime",\
-		0, 10000, PLATFORM_VALUE(40, 105),\
+		0, 10000, MCL_OR_WIN_VALUE(40, 105),\
 		CFG_VALUE_OR_DEFAULT, "active dwell time")
 
 /*
@@ -159,50 +125,8 @@ enum scan_mode_6ghz {
  */
 #define CFG_ACTIVE_MAX_2G_CHANNEL_TIME CFG_INI_UINT(\
 		"active_max_channel_time_2g",\
-		0, 10000, PLATFORM_VALUE(80, 0),\
+		0, 10000, MCL_OR_WIN_VALUE(80, 0),\
 		CFG_VALUE_OR_DEFAULT, "active dwell time for 2G channels")
-
-/*
- * <ini>
- * active_max_channel_time_6g - Set max time for active 6G channel scan
- * @Min: 0
- * @Max: 10000
- * @Default: 40
- *
- * This ini is used to set maximum time in msecs spent in active 6G channel scan
- *
- *
- * Related: None
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_ACTIVE_MAX_6G_CHANNEL_TIME CFG_INI_UINT(\
-		"active_max_channel_time_6g",\
-		0, 10000, 40,\
-		CFG_VALUE_OR_DEFAULT, "active dwell time for 6G channels")
-
-/*
- * <ini>
- * passive_max_channel_time_6g - Set max time for passive 6G channel scan
- * @Min: 0
- * @Max: 10000
- * @Default: 30
- *
- * This ini is used to set maximum time in msecs spent in passive 6G chan scan
- *
- *
- * Related: None
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_PASSIVE_MAX_6G_CHANNEL_TIME CFG_INI_UINT(\
-		"passive_max_channel_time_6g",\
-		0, 10000, 30,\
-		CFG_VALUE_OR_DEFAULT, "passive dwell time for 6G channels")
 
 /*
  * <ini>
@@ -222,7 +146,7 @@ enum scan_mode_6ghz {
  */
 #define CFG_PASSIVE_MAX_CHANNEL_TIME CFG_INI_UINT(\
 		"gPassiveMaxChannelTime",\
-		0, 10000, PLATFORM_VALUE(110, 300),\
+		0, 10000, MCL_OR_WIN_VALUE(110, 300),\
 		CFG_VALUE_OR_DEFAULT, "passive dwell time")
 
 /*
@@ -237,7 +161,7 @@ enum scan_mode_6ghz {
  */
 #define CFG_SCAN_NUM_PROBES CFG_INI_UINT(\
 			"gScanNumProbes",\
-			0, 20, PLATFORM_VALUE(0, 2),\
+			0, 20, MCL_OR_WIN_VALUE(0, 2),\
 			CFG_VALUE_OR_DEFAULT,\
 			"number of probes on each channel")
 
@@ -261,7 +185,7 @@ enum scan_mode_6ghz {
  */
 #define CFG_SCAN_PROBE_REPEAT_TIME CFG_INI_UINT(\
 			"gScanProbeRepeatTime",\
-			0, 50, PLATFORM_VALUE(20, 50),\
+			0, 30, MCL_OR_WIN_VALUE(20, 50),\
 			CFG_VALUE_OR_DEFAULT,\
 			"probe repeat time on each channel")
 
@@ -293,7 +217,7 @@ enum scan_mode_6ghz {
  */
 #define CFG_ADAPTIVE_SCAN_DWELL_MODE CFG_INI_UINT(\
 			"hostscan_adaptive_dwell_mode",\
-			0, 4, PLATFORM_VALUE(2, 0),\
+			0, 4, MCL_OR_WIN_VALUE(2, 0),\
 			CFG_VALUE_OR_DEFAULT,\
 			"Enable adaptive dwell mode")
 
@@ -325,7 +249,7 @@ enum scan_mode_6ghz {
  */
 #define CFG_ADAPTIVE_SCAN_DWELL_MODE_NC CFG_INI_UINT(\
 			"hostscan_adaptive_dwell_mode_no_conn",\
-			0, 4, PLATFORM_VALUE(4, 0),\
+			0, 4, MCL_OR_WIN_VALUE(4, 0),\
 			CFG_VALUE_OR_DEFAULT,\
 			"Enable adaptive dwell mode without connection")
 
@@ -383,30 +307,6 @@ enum scan_mode_6ghz {
 			"Set priority for connection with bssid_hint")
 
 #ifdef FEATURE_WLAN_SCAN_PNO
-/*
- * <ini>
- * g_user_config_sched_scan_plan - set user config sched scan plans.
- * @Min: 0
- * @Max:1
- * @Default: 1
- *
- * This ini is used to decide if user config number of sched scan plan needs to
- * be configured or only one sched scan plan needs to be configured.
- * If this ini is enabled then  user config number of sched scan plans will be
- * configured else only one sched scan plan will be configured.
- *
- * Supported Feature: PNO scan
- *
- * Usage: External
- *
- * </ini>
- */
-
-#define CFG_USER_CONFIG_SCHED_SCAN_PLAN CFG_INI_BOOL(\
-			"g_user_config_sched_scan_plan",\
-			true, \
-			"set user config sched scan plans")
-
 /*
  * <ini>
  * g_max_sched_scan_plan_iterations - pno sched max scan plan iterations.
@@ -732,7 +632,7 @@ enum scan_mode_6ghz {
  * mawc_nlo_enabled - For NLO/PNO, enable MAWC based scan
  * @Min: 0
  * @Max: 1
- * @Default: 0
+ * @Default: 1
  *
  * Enable/Disable the Motion Aided Wireless Connectivity
  * based NLO using this parameter
@@ -745,7 +645,7 @@ enum scan_mode_6ghz {
  */
 #define CFG_MAWC_NLO_ENABLED CFG_INI_BOOL( \
 			"mawc_nlo_enabled", \
-			0, \
+			1, \
 			"Enable MAWC based scan")
 
 /*
@@ -837,8 +737,7 @@ enum scan_mode_6ghz {
 	CFG(CFG_MAWC_NLO_ENABLED) \
 	CFG(CFG_MAWC_NLO_EXP_BACKOFF_RATIO) \
 	CFG(CFG_MAWC_NLO_INIT_SCAN_INTERVAL) \
-	CFG(CFG_MAWC_NLO_MAX_SCAN_INTERVAL) \
-	CFG(CFG_USER_CONFIG_SCHED_SCAN_PLAN)
+	CFG(CFG_MAWC_NLO_MAX_SCAN_INTERVAL)
 
 #else
 #define CFG_SCAN_PNO
@@ -864,7 +763,7 @@ enum scan_mode_6ghz {
  */
 #define CFG_ACTIVE_MAX_CHANNEL_TIME_CONC CFG_INI_UINT(\
 				"gActiveMaxChannelTimeConc",\
-				0, 10000, PLATFORM_VALUE(40, 0),\
+				0, 10000, MCL_OR_WIN_VALUE(40, 0),\
 				CFG_VALUE_OR_DEFAULT, \
 				"active scan time in STA+SAP concurrent")
 
@@ -888,7 +787,7 @@ enum scan_mode_6ghz {
  */
 #define CFG_PASSIVE_MAX_CHANNEL_TIME_CONC CFG_INI_UINT(\
 				"gPassiveMaxChannelTimeConc",\
-				0, 10000, PLATFORM_VALUE(110, 0),\
+				0, 10000, MCL_OR_WIN_VALUE(110, 0),\
 				CFG_VALUE_OR_DEFAULT, \
 				"Set priority for connection with bssid_hint")
 
@@ -911,7 +810,7 @@ enum scan_mode_6ghz {
  */
 #define CFG_MAX_REST_TIME_CONC CFG_INI_UINT(\
 				"nRestTimeConc",\
-				0, 10000, PLATFORM_VALUE(100, 0),\
+				0, 10000, MCL_OR_WIN_VALUE(100, 0),\
 				CFG_VALUE_OR_DEFAULT, \
 				"Rest time before moving to a new channel")
 
@@ -936,7 +835,7 @@ enum scan_mode_6ghz {
  */
 #define CFG_MIN_REST_TIME_CONC CFG_INI_UINT(\
 				"min_rest_time_conc",\
-				0, 50, PLATFORM_VALUE(50, 0),\
+				0, 50, MCL_OR_WIN_VALUE(50, 0),\
 				CFG_VALUE_OR_DEFAULT, \
 				"minimum time spent on home channel")
 
@@ -991,7 +890,7 @@ enum scan_mode_6ghz {
  */
 #define CFG_IDLE_TIME_CONC CFG_INI_UINT(\
 				"gIdleTimeConc",\
-				0, 25, PLATFORM_VALUE(25, 0),\
+				0, 25, MCL_OR_WIN_VALUE(25, 0),\
 				CFG_VALUE_OR_DEFAULT, \
 				"data inactivity time on bss channel")
 
@@ -1248,60 +1147,8 @@ enum scan_mode_6ghz {
 			false,\
 			"Enable/Disable SNR Monitoring")
 
-/*
- * <ini>
- * scan_mode_6ghz - 6ghz Scan mode
- * @Min: 0
- * @Max: 2
- * @Default: 2
- *
- * Configure the 6Ghz scan mode
- * 0 - Remove 6GHz channels in the scan request
- * 1 - Allow/Add 6Ghz PSC channels to scan request
- * 2 - Allow all the 6Ghz channels
- *
- * Related: SCAN
- *
- * Usage: Internal/External
- *
- * </ini>
- */
-#define CFG_6GHZ_SCAN_MODE CFG_INI_UINT( \
-			"scan_mode_6ghz", \
-			SCAN_MODE_6G_NO_CHANNEL, \
-			SCAN_MODE_6G_MAX, \
-			PLATFORM_VALUE(SCAN_MODE_6G_PSC_CHANNEL, \
-				SCAN_MODE_6G_ALL_CHANNEL), \
-			CFG_VALUE_OR_DEFAULT, \
-			"6ghz scan mode")
-
-/*
- * <ini>
- * scan_allow_bss_with_corrupted_ie - Continue scan even if corrupted IEs are
- * present.
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini is used to continue scan even if corrupted IEs are present. If this
- * ini is enable, the scan module skips the IEs following corrupted IEs(IE's
- * with invalid len) and adds the scan entry without completely dropping the
- * frame.
- *
- * Related: scan
- *
- * Usage: External
- *
- * <ini>
- */
-#define CFG_SCAN_ALLOW_BSS_WITH_CORRUPTED_IE CFG_INI_BOOL( \
-			"scan_allow_bss_with_corrupted_ie", \
-			false, \
-			"scan allow bss with corrupted ie")
-
 #define CFG_SCAN_ALL \
 	CFG(CFG_DROP_BCN_ON_CHANNEL_MISMATCH) \
-	CFG(CFG_DROP_BCN_ON_INVALID_FREQ) \
 	CFG(CFG_ENABLE_WAKE_LOCK_IN_SCAN) \
 	CFG(CFG_ACTIVE_MAX_CHANNEL_TIME) \
 	CFG(CFG_ENABLE_DFS_SCAN) \
@@ -1309,8 +1156,6 @@ enum scan_mode_6ghz {
 	CFG(CFG_INITIAL_NO_DFS_SCAN) \
 	CFG(CFG_ACTIVE_MAX_2G_CHANNEL_TIME) \
 	CFG(CFG_PASSIVE_MAX_CHANNEL_TIME) \
-	CFG(CFG_ACTIVE_MAX_6G_CHANNEL_TIME) \
-	CFG(CFG_PASSIVE_MAX_6G_CHANNEL_TIME) \
 	CFG(CFG_SCAN_NUM_PROBES) \
 	CFG(CFG_SCAN_PROBE_REPEAT_TIME) \
 	CFG(CFG_ADAPTIVE_SCAN_DWELL_MODE) \
@@ -1331,8 +1176,6 @@ enum scan_mode_6ghz {
 	CFG(CFG_ENABLE_SNR_MONITORING) \
 	CFG(CFG_AP_SCAN_BURST_DURATION) \
 	CFG(CFG_ENABLE_SKIP_DFS_IN_P2P_SEARCH) \
-	CFG(CFG_6GHZ_SCAN_MODE) \
-	CFG(CFG_SCAN_ALLOW_BSS_WITH_CORRUPTED_IE) \
 	CFG_SCAN_PNO
 
 #endif /* __CONFIG_SCAN_H */

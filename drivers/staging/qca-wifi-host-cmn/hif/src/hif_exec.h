@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -155,7 +155,6 @@ void hif_exec_destroy(struct hif_exec_context *ctx);
 
 int hif_grp_irq_configure(struct hif_softc *scn,
 			  struct hif_exec_context *hif_exec);
-void hif_grp_irq_deconfigure(struct hif_softc *scn);
 irqreturn_t hif_ext_group_interrupt_handler(int irq, void *context);
 
 struct hif_exec_context *hif_exec_get_ctx(struct hif_opaque_softc *hif,
@@ -167,45 +166,16 @@ void hif_exec_kill(struct hif_opaque_softc *scn);
  * hif_pci_irq_set_affinity_hint() - API to set IRQ affinity
  * @hif_ext_group: hif_ext_group to extract the irq info
  *
- * This function will set the WLAN IRQ affinity to the gold
- * cores only for defconfig builds
+ * This function will set the IRQ affinity to the gold cores
+ * only for defconfig builds
  *
  * Return: none
  */
 void hif_pci_irq_set_affinity_hint(
 	struct hif_exec_context *hif_ext_group);
-
-/**
- * hif_pci_ce_irq_set_affinity_hint() - API to set IRQ affinity
- *
- * This function will set the CE IRQ affinity to the gold cores
- * only for defconfig builds
- *
- * @hif_softc: hif_softc to extract the CE irq info
- *
- * Return: none
- */
-void hif_pci_ce_irq_set_affinity_hint(
-	struct hif_softc *scn);
-
-/**
- * hif_pci_ce_irq_remove_affinity_hint() - remove affinity for the irq
- * @irq: irq number to remove affinity from
- */
-static inline void hif_pci_ce_irq_remove_affinity_hint(int irq)
-{
-	hif_irq_affinity_remove(irq);
-}
 #else
 static inline void hif_pci_irq_set_affinity_hint(
 	struct hif_exec_context *hif_ext_group)
-{
-}
-static inline void hif_pci_ce_irq_set_affinity_hint(
-	struct hif_softc *scn)
-{
-}
-static inline void hif_pci_ce_irq_remove_affinity_hint(int irq)
 {
 }
 #endif /* ifdef HIF_CPU_PERF_AFFINE_MASK */

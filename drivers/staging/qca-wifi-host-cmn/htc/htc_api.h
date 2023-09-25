@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2014, 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -38,13 +38,7 @@ extern "C" {
 
 #define HTC_HTT_TRANSFER_HDRSIZE 24
 
-/*
- * NOTE WELL: struct opaque_htc_handle is not defined anywhere. This
- * reference is used to help ensure that a HTC_HANDLE is never used
- * where a different handle type is expected
- */
-struct opaque_htc_handle;
-typedef struct opaque_htc_handle *HTC_HANDLE;
+typedef void *HTC_HANDLE;
 
 typedef uint16_t HTC_SERVICE_ID;
 
@@ -68,8 +62,6 @@ struct ol_ath_htc_stats {
 
 /* To resume HTT Tx queue during runtime resume */
 typedef void (*HTC_EP_RESUME_TX_QUEUE)(void *);
-
-typedef int (*HTC_EP_PADDING_CREDIT_UPDATE) (void *, int);
 
 /* per service connection send completion */
 typedef void (*HTC_EP_SEND_PKT_COMPLETE)(void *, HTC_PACKET *);
@@ -177,8 +169,6 @@ struct htc_ep_callbacks {
 	HTC_EP_SEND_PKT_COMP_MULTIPLE EpTxCompleteMultiple;
 
 	HTC_EP_RESUME_TX_QUEUE ep_resume_tx_queue;
-
-	HTC_EP_PADDING_CREDIT_UPDATE ep_padding_credit_update;
 	/* if EpRecvAllocThresh is non-NULL, HTC will compare the
 	 * threshold value to the current recv packet length and invoke
 	 * the EpRecvAllocThresh callback to acquire a packet buffer
@@ -482,15 +472,6 @@ QDF_STATUS htc_connect_service(HTC_HANDLE HTCHandle,
 void htc_dump(HTC_HANDLE HTCHandle, uint8_t CmdId, bool start);
 
 /**
- * htc_ce_taklet_debug_dump - Dump ce tasklet rings debug data
- * @HTCHandle - HTC handle
- *
- * Debug logs will be printed.
- * Return: None
- */
-void htc_ce_tasklet_debug_dump(HTC_HANDLE htc_handle);
-
-/**
  * htc_send_pkt - Send an HTC packet
  * @HTCHandle - HTC handle
  * @pPacket - packet to send
@@ -716,7 +697,7 @@ struct ol_ath_htc_stats *ieee80211_ioctl_get_htc_stats(HTC_HANDLE
  *
  * Return: htc_handle tx queue depth
  */
-int htc_get_tx_queue_depth(HTC_HANDLE htc_handle, HTC_ENDPOINT_ID endpoint_id);
+int htc_get_tx_queue_depth(HTC_HANDLE *htc_handle, HTC_ENDPOINT_ID endpoint_id);
 
 #ifdef WLAN_FEATURE_FASTPATH
 void htc_ctrl_msg_cmpl(HTC_HANDLE htc_pdev, HTC_ENDPOINT_ID htc_ep_id);
@@ -781,23 +762,9 @@ void htc_clear_bundle_stats(HTC_HANDLE HTCHandle);
 #ifdef FEATURE_RUNTIME_PM
 int htc_pm_runtime_get(HTC_HANDLE htc_handle);
 int htc_pm_runtime_put(HTC_HANDLE htc_handle);
-
-/**
- * htc_dec_return_runtime_cnt: Decrement htc runtime count
- * @htc: HTC handle
- *
- * Return: value of runtime count after decrement
- */
-int32_t htc_dec_return_runtime_cnt(HTC_HANDLE htc);
 #else
 static inline int htc_pm_runtime_get(HTC_HANDLE htc_handle) { return 0; }
 static inline int htc_pm_runtime_put(HTC_HANDLE htc_handle) { return 0; }
-
-static inline
-int32_t htc_dec_return_runtime_cnt(HTC_HANDLE htc)
-{
-	return -1;
-}
 #endif
 
 /**
@@ -849,21 +816,6 @@ void htc_print_credit_history(HTC_HANDLE htc, uint32_t count,
 			      qdf_abstract_print *print, void *print_priv)
 {
 	print(print_priv, "HTC Credit History Feature is disabled");
-}
-#endif
-
-#ifdef SYSTEM_PM_CHECK
-/**
- * htc_system_resume() - Send out any pending WMI/HTT
- *  messages pending in htc queues on system resume.
- * @htc: HTC handle
- *
- * Return: None
- */
-void htc_system_resume(HTC_HANDLE htc);
-#else
-static inline void htc_system_resume(HTC_HANDLE htc)
-{
 }
 #endif
 #endif /* _HTC_API_H_ */

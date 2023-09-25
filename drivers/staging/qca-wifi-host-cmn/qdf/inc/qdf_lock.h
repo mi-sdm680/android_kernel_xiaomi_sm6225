@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -44,13 +44,8 @@
 
 /* Max hold time in micro seconds, 0 to disable detection*/
 #define QDF_MAX_HOLD_TIME_ALOWED_SPINLOCK_IRQ         10000
-#define QDF_MAX_HOLD_TIME_ALOWED_SPINLOCK                 0
-
-#if QDF_LOCK_STATS
-#define QDF_MAX_HOLD_TIME_ALOWED_SPINLOCK_BH        2000000
-#else
 #define QDF_MAX_HOLD_TIME_ALOWED_SPINLOCK_BH        1000000
-#endif
+#define QDF_MAX_HOLD_TIME_ALOWED_SPINLOCK                 0
 
 #if !QDF_LOCK_STATS
 struct lock_stats {};
@@ -90,13 +85,13 @@ do { \
 	uint64_t BEFORE_LOCK_time; \
 	uint64_t AFTER_LOCK_time;  \
 	bool BEFORE_LOCK_is_locked = was_locked; \
-	BEFORE_LOCK_time = qdf_get_log_timestamp_lightweight(); \
+	BEFORE_LOCK_time = qdf_get_log_timestamp(); \
 	do {} while (0)
 
 
 #define AFTER_LOCK(lock, func) \
 	lock->stats.acquired_by = func; \
-	AFTER_LOCK_time = qdf_get_log_timestamp_lightweight(); \
+	AFTER_LOCK_time = qdf_get_log_timestamp(); \
 	lock->stats.acquired++; \
 	lock->stats.last_acquired = AFTER_LOCK_time; \
 	if (BEFORE_LOCK_is_locked) { \
@@ -121,11 +116,11 @@ do { \
 do { \
 	uint64_t BEFORE_LOCK_time; \
 	uint64_t AFTER_LOCK_time;  \
-	BEFORE_LOCK_time = qdf_get_log_timestamp_lightweight(); \
+	BEFORE_LOCK_time = qdf_get_log_timestamp(); \
 	do {} while (0)
 
 #define AFTER_TRYLOCK(lock, trylock_return, func) \
-	AFTER_LOCK_time = qdf_get_log_timestamp_lightweight(); \
+	AFTER_LOCK_time = qdf_get_log_timestamp(); \
 	if (trylock_return) { \
 		lock->stats.acquired++; \
 		lock->stats.last_acquired = AFTER_LOCK_time; \
@@ -138,15 +133,8 @@ do { \
 /* max_hold_time in US */
 #define BEFORE_UNLOCK(lock, max_hold_time) \
 do {\
-	uint64_t BEFORE_UNLOCK_time;  \
-	uint64_t held_time;  \
-	BEFORE_UNLOCK_time = qdf_get_log_timestamp_lightweight(); \
-\
-	if (unlikely(BEFORE_UNLOCK_time < lock->stats.last_acquired)) \
-		held_time = 0; \
-	else \
-		held_time = BEFORE_UNLOCK_time - lock->stats.last_acquired; \
-\
+	uint64_t held_time = qdf_get_log_timestamp() - \
+		lock->stats.last_acquired; \
 	lock->stats.held_time += held_time; \
 \
 	if (held_time > lock->stats.max_held_time) \

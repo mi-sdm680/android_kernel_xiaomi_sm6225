@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -112,7 +112,6 @@ void hif_record_ce_srng_desc_event(struct hif_softc *scn, int ce_id,
 
 	event->type = type;
 	event->time = qdf_get_log_timestamp();
-	event->cpu_id = qdf_get_cpu();
 
 	if (descriptor)
 		qdf_mem_copy(&event->descriptor, descriptor,
@@ -309,7 +308,7 @@ ce_recv_buf_enqueue_srng(struct CE_handle *copyeng,
 	unsigned int sw_index;
 	uint64_t dma_addr = buffer;
 	struct hif_softc *scn = CE_state->scn;
-	struct ce_srng_dest_desc *dest_desc = NULL;
+	struct ce_srng_dest_desc *dest_desc;
 
 	qdf_spin_lock_bh(&CE_state->ce_index_lock);
 	write_index = dest_ring->write_index;
@@ -740,8 +739,8 @@ static void ce_srng_msi_ring_params_setup(struct hif_softc *scn, uint32_t ce_id,
 }
 
 static void ce_srng_src_ring_setup(struct hif_softc *scn, uint32_t ce_id,
-				   struct CE_ring_state *src_ring,
-				   struct CE_attr *attr)
+			struct CE_ring_state *src_ring,
+			struct CE_attr *attr)
 {
 	struct hal_srng_params ring_params = {0};
 
@@ -762,7 +761,6 @@ static void ce_srng_src_ring_setup(struct hif_softc *scn, uint32_t ce_id,
 
 		ring_params.intr_timer_thres_us = 0;
 		ring_params.intr_batch_cntr_thres_entries = 1;
-		ring_params.prefetch_timer = HAL_SRNG_PREFETCH_TIMER;
 	}
 
 	src_ring->srng_ctx = hal_srng_setup(scn->hal_soc, CE_SRC, ce_id, 0,
@@ -788,9 +786,8 @@ static void ce_srng_src_ring_setup(struct hif_softc *scn, uint32_t ce_id,
  * fails to post the last entry due to the race condition.
  */
 static void ce_srng_initialize_dest_timer_interrupt_war(
-					struct CE_ring_state *dest_ring,
-					struct hal_srng_params *ring_params)
-{
+		struct CE_ring_state *dest_ring,
+		struct hal_srng_params *ring_params) {
 	int num_buffers_when_fully_posted = dest_ring->nentries - 2;
 
 	ring_params->low_threshold = num_buffers_when_fully_posted - 1;
@@ -799,10 +796,9 @@ static void ce_srng_initialize_dest_timer_interrupt_war(
 	ring_params->flags |= HAL_SRNG_LOW_THRES_INTR_ENABLE;
 }
 
-static void ce_srng_dest_ring_setup(struct hif_softc *scn,
-				    uint32_t ce_id,
-				    struct CE_ring_state *dest_ring,
-				    struct CE_attr *attr)
+static void ce_srng_dest_ring_setup(struct hif_softc *scn, uint32_t ce_id,
+				struct CE_ring_state *dest_ring,
+				struct CE_attr *attr)
 {
 	struct hal_srng_params ring_params = {0};
 	bool status_ring_timer_thresh_work_arround = true;
@@ -826,41 +822,12 @@ static void ce_srng_dest_ring_setup(struct hif_softc *scn,
 			ring_params.intr_batch_cntr_thres_entries = 0;
 			ring_params.flags |= HAL_SRNG_LOW_THRES_INTR_ENABLE;
 		}
-		ring_params.prefetch_timer = HAL_SRNG_PREFETCH_TIMER;
 	}
 
 	/*Dest ring is also source ring*/
 	dest_ring->srng_ctx = hal_srng_setup(scn->hal_soc, CE_DST, ce_id, 0,
 			&ring_params);
 }
-
-#ifdef WLAN_CE_INTERRUPT_THRESHOLD_CONFIG
-/**
- * ce_status_ring_config_int_threshold() - configure ce status ring interrupt
- *                                         thresholds
- * @scn: hif handle
- * @ring_params: ce srng params
- *
- * Return: None
- */
-static inline
-void ce_status_ring_config_int_threshold(struct hif_softc *scn,
-					 struct hal_srng_params *ring_params)
-{
-	ring_params->intr_timer_thres_us =
-			scn->ini_cfg.ce_status_ring_timer_threshold;
-	ring_params->intr_batch_cntr_thres_entries =
-			scn->ini_cfg.ce_status_ring_batch_count_threshold;
-}
-#else
-static inline
-void ce_status_ring_config_int_threshold(struct hif_softc *scn,
-					 struct hal_srng_params *ring_params)
-{
-	ring_params->intr_timer_thres_us = 0x1000;
-	ring_params->intr_batch_cntr_thres_entries = 0x1;
-}
-#endif /* WLAN_CE_INTERRUPT_THRESHOLD_CONFIG */
 
 static void ce_srng_status_ring_setup(struct hif_softc *scn, uint32_t ce_id,
 				struct CE_ring_state *status_ring,
@@ -877,7 +844,8 @@ static void ce_srng_status_ring_setup(struct hif_softc *scn, uint32_t ce_id,
 	ring_params.num_entries = status_ring->nentries;
 
 	if (!(CE_ATTR_DISABLE_INTR & attr->flags)) {
-		ce_status_ring_config_int_threshold(scn, &ring_params);
+		ring_params.intr_timer_thres_us = 0x1000;
+		ring_params.intr_batch_cntr_thres_entries = 0x1;
 	}
 
 	status_ring->srng_ctx = hal_srng_setup(scn->hal_soc, CE_DST_STATUS,
@@ -946,51 +914,14 @@ static void ce_prepare_shadow_register_v2_cfg_srng(struct hif_softc *scn,
 		/* return with original configuration*/
 		return;
 	}
-	hal_construct_srng_shadow_regs(scn->hal_soc);
+
+	hal_construct_shadow_config(scn->hal_soc);
 	ce_construct_shadow_config_srng(scn);
-	hal_set_shadow_regs(scn->hal_soc);
-	hal_construct_shadow_regs(scn->hal_soc);
+
 	/* get updated configuration */
 	hal_get_shadow_config(scn->hal_soc, shadow_config,
 			      num_shadow_registers_configured);
 }
-
-#ifdef HIF_CE_LOG_INFO
-/**
- * ce_get_index_info_srng(): Get CE index info
- * @scn: HIF Context
- * @ce_state: CE opaque handle
- * @info: CE info
- *
- * Return: 0 for success and non zero for failure
- */
-static
-int ce_get_index_info_srng(struct hif_softc *scn, void *ce_state,
-			   struct ce_index *info)
-{
-	struct CE_state *CE_state = (struct CE_state *)ce_state;
-	uint32_t tp, hp;
-
-	info->id = CE_state->id;
-	if (CE_state->src_ring) {
-		hal_get_sw_hptp(scn->hal_soc, CE_state->src_ring->srng_ctx,
-				&tp, &hp);
-		info->u.srng_info.tp = tp;
-		info->u.srng_info.hp = hp;
-	} else if (CE_state->dest_ring && CE_state->status_ring) {
-		hal_get_sw_hptp(scn->hal_soc, CE_state->status_ring->srng_ctx,
-				&tp, &hp);
-		info->u.srng_info.status_tp = tp;
-		info->u.srng_info.status_hp = hp;
-		hal_get_sw_hptp(scn->hal_soc, CE_state->dest_ring->srng_ctx,
-				&tp, &hp);
-		info->u.srng_info.tp = tp;
-		info->u.srng_info.hp = hp;
-	}
-
-	return 0;
-}
-#endif
 
 static struct ce_ops ce_service_srng = {
 	.ce_get_desc_size = ce_get_desc_size_srng,
@@ -1008,10 +939,6 @@ static struct ce_ops ce_service_srng = {
 	.ce_send_entries_done_nolock = ce_send_entries_done_nolock_srng,
 	.ce_prepare_shadow_register_v2_cfg =
 		ce_prepare_shadow_register_v2_cfg_srng,
-#ifdef HIF_CE_LOG_INFO
-	.ce_get_index_info =
-		ce_get_index_info_srng,
-#endif
 };
 
 struct ce_ops *ce_services_srng(void)
